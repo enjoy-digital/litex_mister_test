@@ -6,6 +6,10 @@
 # Copyright (c) 2018-2019 Florent Kermarrec <florent@enjoy-digital.fr>
 # SPDX-License-Identifier: BSD-2-Clause
 
+# ./digilent_nexys4ddr.py --cpu-type=None --uart-name=uartbone --csr=csr.csv --build --load
+# litex_server --uart --uart-port=/dev/ttyUSBX
+# litex_cli --gui (and play with register :))
+
 from migen import *
 
 from litex.gen import *
@@ -18,6 +22,8 @@ from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.cores.video import VideoVGAPHY
 from litex.soc.cores.led import LedChaser
+
+from litex.soc.interconnect.csr import *
 
 from litedram.modules import MT47H64M16
 from litedram.phy import s7ddrphy
@@ -93,7 +99,8 @@ class BaseSoC(SoCCore):
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
 
-        # MiSTeR / Video ---------------------------------------------------------------------------
+        # MiSTeR -----------------------------------------------------------------------------------
+        control  = Signal(128)
         vga_pads = platform.request("vga")
         self.specials += Instance("emu",
             # Clk/Rst.
@@ -188,11 +195,27 @@ class BaseSoC(SoCCore):
 
             # OSD.
             i_OSD_STATUS       = 0,      # FIXME.
+
+            # STATUS
+            i_status           = control, # FIXME: Name.
         )
         platform.add_verilog_include_path("Template_MiSTer")
         platform.add_source_dir("Template_MiSTer")
         platform.add_source_dir("Template_MiSTer/rtl/")
         platform.add_source_dir("Template_MiSTer/sys/")
+
+        # Control CSRs.
+        self.ctrl_rst = CSRStorage(1)
+        self.ctrl_pal = CSRStorage(1)
+        self.ctrl_col = CSRStorage(2)
+        self.ctrl_ar  = CSRStorage(2)
+
+        self.comb += [
+            control[        0].eq(self.ctrl_rst.storage),
+            control[        2].eq(self.ctrl_pal.storage),
+            control[    3:3+2].eq(self.ctrl_col.storage),
+            control[121:121+2].eq( self.ctrl_ar.storage),
+        ]
 
 # Build --------------------------------------------------------------------------------------------
 

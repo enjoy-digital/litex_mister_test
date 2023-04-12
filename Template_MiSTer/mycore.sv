@@ -170,6 +170,8 @@ module emu
 
 	input         OSD_STATUS,
 
+	input [127:0] status,
+
 	output     [3:0]  DEBUG
 );
 
@@ -238,25 +240,25 @@ localparam CONF_STR = {
 
 wire forced_scandoubler;
 wire   [1:0] buttons;
-wire [127:0] status;
+//wire [127:0] status;
 wire  [10:0] ps2_key;
 
-hps_io #(.CONF_STR(CONF_STR)) hps_io
-(
-	.clk_sys(clk_sys),
-	.HPS_BUS(HPS_BUS),
-	.EXT_BUS(),
-	.gamma_bus(),
-
-	.forced_scandoubler(forced_scandoubler),
-
-	.buttons(buttons),
-	.status(status),
-	.status_menumask({status[5]}),
-	
-	.ps2_key(ps2_key),
-	.DEBUG(DEBUG)
-);
+//hps_io #(.CONF_STR(CONF_STR)) hps_io
+//(
+//	.clk_sys(clk_sys),
+//	.HPS_BUS(HPS_BUS),
+//	.EXT_BUS(),
+//	.gamma_bus(),
+//
+//	.forced_scandoubler(forced_scandoubler),
+//
+//	.buttons(buttons),
+//	.status(status),
+//	.status_menumask({status[5]}),
+//
+//	.ps2_key(ps2_key),
+//	.DEBUG(DEBUG)
+//);
 
 ///////////////////////   CLOCKS   ///////////////////////////////
 
