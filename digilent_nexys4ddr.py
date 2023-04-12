@@ -104,7 +104,7 @@ class BaseSoC(SoCCore):
             io_HPS_BUS         = Open(), # FIXME.
 
             # Video (Generic).
-            o_CLK_VIDEO        = ClockSignal("vga"),
+            o_CLK_VIDEO        = Open(),
             o_CE_PIXEL         = Open(), # FIXME.
             o_VIDEO_ARX        = Open(), # FIXME.
             o_VIDEO_ARY        = Open(), # FIXME.
@@ -132,7 +132,7 @@ class BaseSoC(SoCCore):
             o_LED_DISK         = Open(), # FIXME.
 
             # Buttons.
-            i_BUTTONS          = Open(), # FIXME.
+            o_BUTTONS          = Open(), # FIXME.
 
             # Audio.
             i_CLK_AUDIO        = 0,      # FIXME.
