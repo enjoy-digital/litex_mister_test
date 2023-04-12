@@ -166,7 +166,8 @@ module hps_io #(parameter CONF_STR, CONF_STR_BRAM=1, PS2DIV=0, WIDE=0, VDNUM=1, 
 	output reg [31:0] uart_speed,
 
 	// for core-specific extensions
-	inout      [35:0] EXT_BUS
+	inout      [35:0] EXT_BUS,
+	output     [3:0]  DEBUG
 );
 
 assign EXT_BUS[31:16] = HPS_BUS[31:16];
@@ -176,11 +177,11 @@ localparam DW = (WIDE) ? 15 : 7;
 localparam AW = (WIDE) ? 12 : 13;
 localparam VD = VDNUM-1;
 
-wire        io_strobe= HPS_BUS[33];
-wire        io_enable= HPS_BUS[34];
-wire        fp_enable= HPS_BUS[35];
-wire        io_wide  = (WIDE) ? 1'b1 : 1'b0;
-wire [15:0] io_din   = HPS_BUS[31:16];
+wire        io_strobe = HPS_BUS[33];
+wire        io_enable = HPS_BUS[34];
+wire        fp_enable = HPS_BUS[35];
+wire        io_wide   = (WIDE) ? 1'b1 : 1'b0;
+wire [15:0] io_din    = HPS_BUS[31:16];
 reg  [15:0] io_dout;
 
 assign HPS_BUS[37]   = ioctl_wait;
@@ -235,9 +236,15 @@ video_calc video_calc
 localparam STRLEN = $size(CONF_STR)>>3;
 localparam MAX_W = $clog2((32 > (STRLEN+2)) ? 32 : (STRLEN+2))-1;
 
+`ifdef XILINX
+localparam NOT_XILINX = 0;
+`else
+localparam NOT_XILINX = 1;
+`endif
+
 wire [7:0] conf_byte;
 generate
-	if(CONF_STR_BRAM) begin
+	if(CONF_STR_BRAM && NOT_XILINX) begin
 		confstr_rom #(CONF_STR, STRLEN) confstr_rom(.*, .conf_addr(byte_cnt - 1'd1));
 	end
 	else begin
@@ -258,6 +265,18 @@ wire       extended = (~pressed ? (ps2_key_raw[23:16] == 8'he0) : (ps2_key_raw[1
 reg [MAX_W:0] byte_cnt;
 reg   [3:0] sdn_ack;
 wire [15:0] disk = 16'd1 << io_din[11:8];
+
+`ifdef DEBUG_HPS_OP
+spi_master spi_debug (
+	.spi_controller__sdo(DEBUG[1]),
+	.spi_controller__sck(DEBUG[2]),
+	.spi_controller__cs(DEBUG[3]),
+	.word_out({byte_cnt, io_din, io_dout}),
+	.start_transfer(io_strobe),
+	.clk(clk_sys),
+	.rst(reset)
+	);
+`endif
 
 always@(posedge clk_sys) begin : uio_block
 	reg [15:0] cmd;
@@ -550,6 +569,17 @@ end
 
 
 ///////////////////////////////   PS2   ///////////////////////////////
+
+reg  [7:0] kbd_data;
+reg        kbd_we;
+wire [8:0] kbd_data_host;
+reg        kbd_rd;
+
+reg  [7:0] mouse_data;
+reg        mouse_we;
+wire [8:0] mouse_data_host;
+reg        mouse_rd;
+
 generate
 	if(PS2DIV) begin
 		reg clk_ps2;
@@ -561,11 +591,6 @@ generate
 				cnt <= 0;
 			end
 		end
-
-		reg  [7:0] kbd_data;
-		reg        kbd_we;
-		wire [8:0] kbd_data_host;
-		reg        kbd_rd;
 
 		ps2_device keyboard
 		(
@@ -584,11 +609,6 @@ generate
 			.rdata(kbd_data_host),
 			.rd(kbd_rd)
 		);
-
-		reg  [7:0] mouse_data;
-		reg        mouse_we;
-		wire [8:0] mouse_data_host;
-		reg        mouse_rd;
 
 		ps2_device mouse
 		(
@@ -1008,7 +1028,7 @@ module confstr_rom #(parameter CONF_STR, STRLEN)
 	output reg [7:0] conf_byte
 );
 
-wire [7:0] rom[STRLEN];
+reg [7:0] rom[STRLEN];
 initial for(int i = 0; i < STRLEN; i++) rom[i] = CONF_STR[((STRLEN-i)*8)-1 -:8];
 always @ (posedge clk_sys) conf_byte <= rom[conf_addr];
 
