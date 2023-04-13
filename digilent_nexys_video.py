@@ -34,6 +34,7 @@ from litedram.phy import s7ddrphy
 from liteeth.phy.s7rgmii import LiteEthPHYRGMII
 
 from litex.soc.cores.dma import WishboneDMAWriter
+
 # CRG ----------------------------------------------------------------------------------------------
 
 class _CRG(LiteXModule):
@@ -76,8 +77,8 @@ class _CRG(LiteXModule):
             video_pll.reset.eq(~rst_n | self.rst)
             video_pll.register_clkin(clk100, 100e6)
             video_pll.create_clkout(self.cd_emu,    50e6)
-            video_pll.create_clkout(self.cd_hdmi,   25e6)
-            video_pll.create_clkout(self.cd_hdmi5x, 5*25e6)
+            video_pll.create_clkout(self.cd_hdmi,   40e6)
+            video_pll.create_clkout(self.cd_hdmi5x, 5*40e6)
 
 # BaseSoC ------------------------------------------------------------------------------------------
 
@@ -156,8 +157,7 @@ class BaseSoC(SoCCore):
 
         # MiSTeR -----------------------------------------------------------------------------------
         control    = Signal(128)
-        video_clk  = Signal()
-        video_pads = Record([
+        vga_pads = Record([
             ("clk",     1),
             # Synchronization signals.
             ("hsync_n", 1),
@@ -177,18 +177,18 @@ class BaseSoC(SoCCore):
             io_HPS_BUS         = Open(), # FIXME.
 
             # Video (Generic).
-            o_CLK_VIDEO        = video_pads.clk,
+            o_CLK_VIDEO        = vga_pads.clk,
             o_CE_PIXEL         = Open(), # FIXME.
             o_VIDEO_ARX        = Open(), # FIXME.
             o_VIDEO_ARY        = Open(), # FIXME.
 
             # Video VGA.
-            o_VGA_R            = video_pads.r[::-1],
-            o_VGA_G            = video_pads.g[::-1],
-            o_VGA_B            = video_pads.b[::-1],
-            o_VGA_HS           = video_pads.hsync_n,
-            o_VGA_VS           = video_pads.vsync_n,
-            o_VGA_DE           = video_pads.de,
+            o_VGA_R            = vga_pads.r[::-1],
+            o_VGA_G            = vga_pads.g[::-1],
+            o_VGA_B            = vga_pads.b[::-1],
+            o_VGA_HS           = vga_pads.hsync_n,
+            o_VGA_VS           = vga_pads.vsync_n,
+            o_VGA_DE           = vga_pads.de,
             o_VGA_F1           = Open(), # FIXME.
             o_VGA_SL           = Open(), # FIXME.
             o_VGA_SCALER       = Open(), # FIXME.
@@ -285,20 +285,68 @@ class BaseSoC(SoCCore):
 
         # Video Clk Domain.
         self.cd_video = ClockDomain()
-        self.comb += self.cd_video.clk.eq(video_pads.clk)
+        self.comb += self.cd_video.clk.eq(vga_pads.clk)
 
         # Video Capture/DMA.
+
+        class VGACapture(LiteXModule):
+            def __init__(self, vga_pads, base=0x40c0_0000, width=800):
+                self.source = source = stream.Endpoint([("address", 32), ("data", 32)])
+
+                # # #
+
+                self.pixel = pixel = Signal(16)
+                self.line  = line  = Signal(16)
+
+                vsync_n_r = Signal()
+                hsync_n_r = Signal()
+                self.sync.video += vsync_n_r.eq(vga_pads.vsync_n)
+                self.sync.video += hsync_n_r.eq(vga_pads.hsync_n)
+
+                fsm = FSM(reset_state="VSYNC")
+                fsm = ClockDomainsRenamer("video")(fsm)
+                self.submodules.fsm = fsm
+                fsm.act("VSYNC",
+                    NextValue(pixel, 0),
+                    NextValue(line,  0),
+                    NextState("RUN"),
+                )
+                fsm.act("HSYNC",
+                    NextValue(pixel,       0),
+                    NextValue(line, line + 1),
+                    NextState("RUN"),
+                )
+                fsm.act("RUN",
+                    source.address.eq(base//4 + line*width + pixel), # Word addressing.
+                    source.data[ 0: 8].eq(vga_pads.r),
+                    source.data[ 8:16].eq(vga_pads.g),
+                    source.data[16:24].eq(vga_pads.b),
+                    If(vga_pads.de,
+                        source.valid.eq(1),
+                        NextValue(pixel, pixel + 1),
+                    ),
+                    If(vga_pads.hsync_n & ~hsync_n_r,
+                        NextState("HSYNC")
+                    ),
+                    If(vga_pads.vsync_n & ~vsync_n_r,
+                        NextState("VSYNC")
+                    ),
+                )
+
         class VideoCapture(LiteXModule):
-            def __init__(self, fifo_depth=128):
-                self.sink = stream.Endpoint([("data", 32), ("vsync_n", 1)])
+            def __init__(self, vga_pads, fifo_depth=128):
                 self.bus  = wishbone.Interface(data_width=32, address_width=32)
 
                 # # #
 
+                # VGA Capture.
+                # ------------
+                self.vga_capture = VGACapture(vga_pads, base=0x40c0_0000, width=800)
+
                 # Clock Domain Crossing (pix_clk -> sys_clk).
                 # -------------------------------------------
                 self.cdc = stream.ClockDomainCrossing(
-                    layout   = [("data", 32)],
+                    layout   = [("address", 32), ("data", 32)],
                     cd_from  = "video",
                     cd_to    = "sys",
                     buffered = True,
@@ -307,61 +355,36 @@ class BaseSoC(SoCCore):
 
                 # DMA.
                 # ----
-                self.dma = WishboneDMAWriter(bus=self.bus, with_csr=True)
+                self.dma = WishboneDMAWriter(bus=self.bus, with_csr=False)
 
                 # Pipeline.
                 # ---------
-                self.comb += self.cdc.source.connect(self.dma.sink, omit={"last"})
+                self.comb += self.vga_capture.source.connect(self.cdc.sink)
+                self.comb += self.cdc.source.connect(self.dma.sink)
 
-                # FSM.
-                # ----
-                enable = Signal()
-                self.specials += MultiReg(self.dma._enable.storage, enable, "video")
 
-                fsm = FSM(reset_state="IDLE")
-                fsm = ClockDomainsRenamer("video")(fsm)
-                fsm = ResetInserter()(fsm)
-                self.fsm = fsm
-                self.comb += fsm.reset.eq(~enable)
-                fsm.act("IDLE",
-                    self.sink.ready.eq(1),
-                    If(self.sink.vsync_n,
-                        NextState("RUN")
-                    )
-                )
-                fsm.act("RUN",
-                    self.sink.connect(self.cdc.sink, omit={"vsync_n"})
-                )
-
-        self.video_capture = VideoCapture(fifo_depth=128)
-        self.comb += [
-            self.video_capture.sink.valid.eq(video_pads.de),
-            self.video_capture.sink.vsync_n.eq(video_pads.vsync_n),
-            self.video_capture.sink.data[ 0: 8].eq(video_pads.r),
-            self.video_capture.sink.data[ 8:16].eq(video_pads.g),
-            self.video_capture.sink.data[16:24].eq(video_pads.b),
-        ]
+        self.video_capture = VideoCapture(vga_pads=vga_pads, fifo_depth=128)
+        #self.comb += self.video_capture.bus.ack.eq(1)
         self.bus.add_master(name="video_capture", master=self.video_capture.bus)
-
 
 #        from litescope import LiteScopeAnalyzer
 #        analyzer_signals = [
-#            video_pads,
-#            self.video_capture.fsm,
-#            self.video_capture.cdc.sink,
-#            self.video_capture.cdc.source,
-#            self.video_capture.bus,
+#            vga_pads,
+#            self.video_capture.vga_capture.fsm,
+#            self.video_capture.vga_capture.line,
+#            self.video_capture.vga_capture.pixel,
+#            self.video_capture.vga_capture.source,
 #        ]
 #        self.analyzer = LiteScopeAnalyzer(analyzer_signals,
-#            depth        = 2048,
-#            clock_domain = "sys",
+#            depth        = 512,
+#            clock_domain = "video",
 #            samplerate   = sys_clk_freq,
 #            csr_csv      = "analyzer.csv"
 #        )
 
         # Video Framebuffer.
         self.videophy = VideoS7HDMIPHY(platform.request("hdmi_out"), clock_domain="hdmi")
-        self.add_video_framebuffer(phy=self.videophy, timings="640x480@75Hz", clock_domain="hdmi")
+        self.add_video_framebuffer(phy=self.videophy, timings="800x600@60Hz", clock_domain="hdmi")
 
         # Leds -------------------------------------------------------------------------------------
         if with_led_chaser:
