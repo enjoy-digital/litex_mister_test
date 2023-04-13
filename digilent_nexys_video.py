@@ -8,7 +8,7 @@
 
 # ./digilent_nexys_video.py --uart-name=uartbone --csr-csv=csr.csv --build --load
 # litex_server --uart --uart-port=/dev/ttyUSBX
-# ./test_video.py
+# litex_cli --gui (and play with registers :))
 
 from migen import *
 from migen.genlib.cdc import MultiReg

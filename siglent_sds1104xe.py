@@ -6,17 +6,9 @@
 # Copyright (c) 2020 Florent Kermarrec <florent@enjoy-digital.fr>
 # SPDX-License-Identifier: BSD-2-Clause
 
-# Build/Use ----------------------------------------------------------------------------------------
-# Build/Load bitstream:
 # ./siglent_sds1104xe.py --cpu-type=vexriscv --uart-name=crossover --with-etherbone --csr-csv=csr.csv --build --load
-#
-# Test Ethernet:
-# ping 192.168.1.50
-#
-# Test Console:
 # litex_server --udp
-# litex_cli --gui
-# --------------------------------------------------------------------------------------------------
+# litex_cli --gui (and play with registers :))
 
 from migen import *
 from migen.genlib.cdc import MultiReg

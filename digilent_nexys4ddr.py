@@ -8,7 +8,7 @@
 
 # ./digilent_nexys4ddr.py --cpu-type=None --uart-name=uartbone --csr=csr.csv --build --load
 # litex_server --uart --uart-port=/dev/ttyUSBX
-# litex_cli --gui (and play with register :))
+# litex_cli --gui (and play with registers :))
 
 from migen import *
 
