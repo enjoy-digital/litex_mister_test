@@ -6,7 +6,12 @@
 # Copyright (c) 2015-2019 Florent Kermarrec <florent@enjoy-digital.fr>
 # SPDX-License-Identifier: BSD-2-Clause
 
+# ./digilent_nexys_video.py --uart-name=uartbone --csr-csv=csr.csv --build --load
+# litex_server --uart --uart-port=/dev/ttyUSBX
+# ./test_video.py
+
 from migen import *
+from migen.genlib.cdc import MultiReg
 
 from litex.gen import *
 
@@ -15,6 +20,11 @@ from litex_boards.platforms import digilent_nexys_video
 from litex.soc.cores.clock import *
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
+
+from litex.soc.interconnect.csr import *
+from litex.soc.interconnect import stream
+from litex.soc.interconnect import wishbone
+
 from litex.soc.cores.video import VideoS7HDMIPHY
 from litex.soc.cores.led import LedChaser
 
@@ -23,6 +33,7 @@ from litedram.phy import s7ddrphy
 
 from liteeth.phy.s7rgmii import LiteEthPHYRGMII
 
+from litex.soc.cores.dma import WishboneDMAWriter
 # CRG ----------------------------------------------------------------------------------------------
 
 class _CRG(LiteXModule):
@@ -35,6 +46,7 @@ class _CRG(LiteXModule):
         self.cd_hdmi      = ClockDomain()
         self.cd_hdmi5x    = ClockDomain()
         self.cd_clk100    = ClockDomain()
+        self.cd_emu       = ClockDomain()
 
         # # #
 
@@ -63,6 +75,7 @@ class _CRG(LiteXModule):
             self.video_pll = video_pll = S7MMCM(speedgrade=-1)
             video_pll.reset.eq(~rst_n | self.rst)
             video_pll.register_clkin(clk100, 100e6)
+            video_pll.create_clkout(self.cd_emu,    50e6)
             video_pll.create_clkout(self.cd_hdmi,   25e6)
             video_pll.create_clkout(self.cd_hdmi5x, 5*25e6)
 
@@ -74,13 +87,11 @@ class BaseSoC(SoCCore):
         with_led_chaser        = True,
         with_sata              = False, sata_gen="gen2",
         vadj                   = "1.2V",
-        with_video_terminal    = False,
-        with_video_framebuffer = False,
         **kwargs):
         platform = digilent_nexys_video.Platform(toolchain=toolchain)
 
         # CRG --------------------------------------------------------------------------------------
-        with_video_pll = (with_video_terminal or with_video_framebuffer)
+        with_video_pll = True
         self.crg = _CRG(platform, sys_clk_freq, toolchain,
             with_video_pll       = with_video_pll
         )
@@ -143,13 +154,214 @@ class BaseSoC(SoCCore):
             # Core
             self.add_sata(phy=self.sata_phy, mode="read+write")
 
-        # Video ------------------------------------------------------------------------------------
-        if with_video_terminal or with_video_framebuffer:
-            self.videophy = VideoS7HDMIPHY(platform.request("hdmi_out"), clock_domain="hdmi")
-            if with_video_terminal:
-                self.add_video_terminal(phy=self.videophy, timings="640x480@75Hz", clock_domain="hdmi")
-            if with_video_framebuffer:
-                self.add_video_framebuffer(phy=self.videophy, timings="640x480@75Hz", clock_domain="hdmi")
+        # MiSTeR -----------------------------------------------------------------------------------
+        control    = Signal(128)
+        video_clk  = Signal()
+        video_pads = Record([
+            ("clk",     1),
+            # Synchronization signals.
+            ("hsync_n", 1),
+            ("vsync_n", 1),
+            ("de",      1),
+            # Data signals.
+            ("r",       8),
+            ("g",       8),
+            ("b",       8),
+        ])
+        self.specials += Instance("emu",
+            # Clk/Rst.
+            i_CLK_50M          = ClockSignal("emu"),
+            i_RESET            = ResetSignal("emu"),
+
+            # HPS Bus.
+            io_HPS_BUS         = Open(), # FIXME.
+
+            # Video (Generic).
+            o_CLK_VIDEO        = video_pads.clk,
+            o_CE_PIXEL         = Open(), # FIXME.
+            o_VIDEO_ARX        = Open(), # FIXME.
+            o_VIDEO_ARY        = Open(), # FIXME.
+
+            # Video VGA.
+            o_VGA_R            = video_pads.r[::-1],
+            o_VGA_G            = video_pads.g[::-1],
+            o_VGA_B            = video_pads.b[::-1],
+            o_VGA_HS           = video_pads.hsync_n,
+            o_VGA_VS           = video_pads.vsync_n,
+            o_VGA_DE           = video_pads.de,
+            o_VGA_F1           = Open(), # FIXME.
+            o_VGA_SL           = Open(), # FIXME.
+            o_VGA_SCALER       = Open(), # FIXME.
+            o_VGA_DISABLE      = Open(), # FIXME.
+
+            # HDMI.
+            i_HDMI_WIDTH       = 0,      # FIXME.
+            i_HDMI_HEIGHT      = 0,      # FIXME.
+            o_HDMI_FREEZE      = Open(), # FIXME.
+
+            # Leds.
+            o_LED_USER         = Open(), # FIXME.
+            o_LED_POWER        = Open(), # FIXME.
+            o_LED_DISK         = Open(), # FIXME.
+
+            # Buttons.
+            o_BUTTONS          = Open(), # FIXME.
+
+            # Audio.
+            i_CLK_AUDIO        = 0,      # FIXME.
+            o_AUDIO_L          = Open(), # FIXME.
+            o_AUDIO_R          = Open(), # FIXME.
+            o_AUDIO_S          = Open(), # FIXME.
+            o_AUDIO_MIX        = Open(), # FIXME.
+            io_ADC_BUS         = Open(), # FIXME.
+
+            # SDCard.
+            o_SD_SCK           = Open(), # FIXME.
+            o_SD_MOSI          = Open(), # FIXME.
+            i_SD_MISO          = 0,      # FIXME.
+            o_SD_CS            = Open(), # FIXME.
+            i_SD_CD            = 0,      # FIXME.
+
+            # DDRAM (DDR3).
+            o_DDRAM_CLK        = Open(), # FIXME.
+            i_DDRAM_BUSY       = 0,      # FIXME.
+            o_DDRAM_BURSTCNT   = Open(), # FIXME.
+            o_DDRAM_ADDR       = Open(), # FIXME.
+            i_DDRAM_DOUT       = 0,      # FIXME.
+            i_DDRAM_DOUT_READY = 0,      # FIXME.
+            o_DDRAM_RD         = Open(), # FIXME.
+            o_DDRAM_DIN        = Open(), # FIXME.
+            o_DDRAM_BE         = Open(), # FIXME.
+            o_DDRAM_WE         = Open(), # FIXME.
+
+            # SDRAM.
+            o_SDRAM_CLK        = Open(), # FIXME.
+            o_SDRAM_CKE        = Open(), # FIXME.
+            o_SDRAM_A          = Open(), # FIXME.
+            o_SDRAM_BA         = Open(), # FIXME.
+            io_SDRAM_DQ        = Open(), # FIXME.
+            o_SDRAM_DQML       = Open(), # FIXME.
+            o_SDRAM_DQMH       = Open(), # FIXME.
+            o_SDRAM_nCS        = Open(), # FIXME.
+            o_SDRAM_nCAS       = Open(), # FIXME.
+            o_SDRAM_nRAS       = Open(), # FIXME.
+            o_SDRAM_nWE        = Open(), # FIXME.
+
+            # UART.
+            i_UART_CTS         = 0,      # FIXME.
+            o_UART_RTS         = Open(), # FIXME.
+            i_UART_RXD         = 0,      # FIXME.
+            o_UART_TXD         = Open(), # FIXME.
+            o_UART_DTR         = Open(), # FIXME.
+            i_UART_DSR         = 0,      # FIXME.
+
+            # USER.
+            i_USER_IN          = 0,      # FIXME.
+            o_USER_OUT         = Open(), # FIXME.
+
+            # OSD.
+            i_OSD_STATUS       = 0,      # FIXME.
+
+            # STATUS
+            i_status           = control, # FIXME: Name.
+        )
+        platform.add_verilog_include_path("Template_MiSTer")
+        platform.add_source_dir("Template_MiSTer")
+        platform.add_source_dir("Template_MiSTer/rtl/")
+        platform.add_source_dir("Template_MiSTer/sys/")
+
+        # Control CSRs.
+        self.ctrl_rst = CSRStorage(1)
+        self.ctrl_pal = CSRStorage(1)
+        self.ctrl_col = CSRStorage(2)
+        self.ctrl_ar  = CSRStorage(2)
+
+        self.comb += [
+            control[        0].eq(self.ctrl_rst.storage),
+            control[        2].eq(self.ctrl_pal.storage),
+            control[    3:3+2].eq(self.ctrl_col.storage),
+            control[121:121+2].eq( self.ctrl_ar.storage),
+        ]
+
+        # Video Clk Domain.
+        self.cd_video = ClockDomain()
+        self.comb += self.cd_video.clk.eq(video_pads.clk)
+
+        # Video Capture/DMA.
+        class VideoCapture(LiteXModule):
+            def __init__(self, fifo_depth=128):
+                self.sink = stream.Endpoint([("data", 32), ("vsync_n", 1)])
+                self.bus  = wishbone.Interface(data_width=32, address_width=32)
+
+                # # #
+
+                # Clock Domain Crossing (pix_clk -> sys_clk).
+                # -------------------------------------------
+                self.cdc = stream.ClockDomainCrossing(
+                    layout   = [("data", 32)],
+                    cd_from  = "video",
+                    cd_to    = "sys",
+                    buffered = True,
+                    depth    = fifo_depth
+                )
+
+                # DMA.
+                # ----
+                self.dma = WishboneDMAWriter(bus=self.bus, with_csr=True)
+
+                # Pipeline.
+                # ---------
+                self.comb += self.cdc.source.connect(self.dma.sink, omit={"last"})
+
+                # FSM.
+                # ----
+                enable = Signal()
+                self.specials += MultiReg(self.dma._enable.storage, enable, "video")
+
+                fsm = FSM(reset_state="IDLE")
+                fsm = ClockDomainsRenamer("video")(fsm)
+                fsm = ResetInserter()(fsm)
+                self.fsm = fsm
+                self.comb += fsm.reset.eq(~enable)
+                fsm.act("IDLE",
+                    self.sink.ready.eq(1),
+                    If(self.sink.vsync_n,
+                        NextState("RUN")
+                    )
+                )
+                fsm.act("RUN",
+                    self.sink.connect(self.cdc.sink, omit={"vsync_n"})
+                )
+
+        self.video_capture = VideoCapture(fifo_depth=128)
+        self.comb += [
+            self.video_capture.sink.valid.eq(video_pads.de),
+            self.video_capture.sink.vsync_n.eq(video_pads.vsync_n),
+            self.video_capture.sink.data[ 0: 8].eq(video_pads.r),
+            self.video_capture.sink.data[ 8:16].eq(video_pads.g),
+            self.video_capture.sink.data[16:24].eq(video_pads.b),
+        ]
+        self.bus.add_master(name="video_capture", master=self.video_capture.bus)
+
+
+#        from litescope import LiteScopeAnalyzer
+#        analyzer_signals = [
+#            video_pads,
+#            self.video_capture.fsm,
+#            self.video_capture.cdc.sink,
+#            self.video_capture.cdc.source,
+#            self.video_capture.bus,
+#        ]
+#        self.analyzer = LiteScopeAnalyzer(analyzer_signals,
+#            depth        = 2048,
+#            clock_domain = "sys",
+#            samplerate   = sys_clk_freq,
+#            csr_csv      = "analyzer.csv"
+#        )
+
+        # Video Framebuffer.
+        self.videophy = VideoS7HDMIPHY(platform.request("hdmi_out"), clock_domain="hdmi")
+        self.add_video_framebuffer(phy=self.videophy, timings="640x480@75Hz", clock_domain="hdmi")
 
         # Leds -------------------------------------------------------------------------------------
         if with_led_chaser:
@@ -174,9 +386,6 @@ def main():
     parser.add_target_argument("--with-sata",            action="store_true", help="Enable SATA support (over FMCRAID).")
     parser.add_target_argument("--sata-gen",             default="2",         help="SATA Gen.", choices=["1", "2"])
     parser.add_target_argument("--vadj",                 default="1.2V",      help="FMC VADJ value.", choices=["1.2V", "1.8V", "2.5V", "3.3V"])
-    viopts = parser.target_group.add_mutually_exclusive_group()
-    viopts.add_argument("--with-video-terminal",    action="store_true", help="Enable Video Terminal (HDMI).")
-    viopts.add_argument("--with-video-framebuffer", action="store_true", help="Enable Video Framebuffer (HDMI).")
     args = parser.parse_args()
 
     soc = BaseSoC(
@@ -186,8 +395,6 @@ def main():
         with_sata              = args.with_sata,
         sata_gen               = "gen" + args.sata_gen,
         vadj                   = args.vadj,
-        with_video_terminal    = args.with_video_terminal,
-        with_video_framebuffer = args.with_video_framebuffer,
         **parser.soc_argdict
     )
     if args.with_spi_sdcard:
