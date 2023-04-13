@@ -36,6 +36,7 @@ from litex.soc.cores.video import VideoVGAPHY
 from litex.soc.cores.dma import WishboneDMAWriter
 
 from gateware.mister import MiSTeR
+from gateware.vga_capture import VGACapture
 
 # CRG ----------------------------------------------------------------------------------------------
 
@@ -112,100 +113,13 @@ class BaseSoC(SoCCore):
         self.cd_video = ClockDomain()
         self.comb += self.cd_video.clk.eq(mister.vga.clk)
 
-        # Video Capture/DMA.
-
-        class VGACapture(LiteXModule):
-            def __init__(self, vga_pads, base=0x40c0_0000, width=800):
-                self.source = source = stream.Endpoint([("address", 32), ("data", 32)])
-
-                # # #
-
-                self.pixel = pixel = Signal(16)
-                self.line  = line  = Signal(16)
-
-                vsync_n_r = Signal()
-                hsync_n_r = Signal()
-                self.sync.video += vsync_n_r.eq(vga_pads.vsync_n)
-                self.sync.video += hsync_n_r.eq(vga_pads.hsync_n)
-
-                fsm = FSM(reset_state="VSYNC")
-                fsm = ClockDomainsRenamer("video")(fsm)
-                self.submodules.fsm = fsm
-                fsm.act("VSYNC",
-                    NextValue(pixel, 0),
-                    NextValue(line,  0),
-                    NextState("RUN"),
-                )
-                fsm.act("HSYNC",
-                    NextValue(pixel,       0),
-                    NextValue(line, line + 1),
-                    NextState("RUN"),
-                )
-                fsm.act("RUN",
-                    source.address.eq(base//4 + line*width + pixel), # Word addressing.
-                    source.data[ 0: 8].eq(vga_pads.r),
-                    source.data[ 8:16].eq(vga_pads.g),
-                    source.data[16:24].eq(vga_pads.b),
-                    If(vga_pads.de,
-                        source.valid.eq(1),
-                        NextValue(pixel, pixel + 1),
-                    ),
-                    If(vga_pads.hsync_n & ~hsync_n_r,
-                        NextState("HSYNC")
-                    ),
-                    If(vga_pads.vsync_n & ~vsync_n_r,
-                        NextState("VSYNC")
-                    ),
-                )
-
-        class VideoCapture(LiteXModule):
-            def __init__(self, vga_pads, fifo_depth=128):
-                self.bus  = wishbone.Interface(data_width=32, address_width=32)
-
-                # # #
-
-                # VGA Capture.
-                # ------------
-                self.vga_capture = VGACapture(vga_pads, base=0x40c0_0000, width=800)
-
-                # Clock Domain Crossing (pix_clk -> sys_clk).
-                # -------------------------------------------
-                self.cdc = stream.ClockDomainCrossing(
-                    layout   = [("address", 32), ("data", 32)],
-                    cd_from  = "video",
-                    cd_to    = "sys",
-                    buffered = True,
-                    depth    = fifo_depth
-                )
-
-                # DMA.
-                # ----
-                self.dma = WishboneDMAWriter(bus=self.bus, with_csr=False)
-
-                # Pipeline.
-                # ---------
-                self.comb += self.vga_capture.source.connect(self.cdc.sink)
-                self.comb += self.cdc.source.connect(self.dma.sink)
-
-
-        self.video_capture = VideoCapture(vga_pads=mister.vga, fifo_depth=128)
-        #self.comb += self.video_capture.bus.ack.eq(1)
-        self.bus.add_master(name="video_capture", master=self.video_capture.bus)
-
-#        from litescope import LiteScopeAnalyzer
-#        analyzer_signals = [
-#            mister.vga,
-#            self.video_capture.vga_capture.fsm,
-#            self.video_capture.vga_capture.line,
-#            self.video_capture.vga_capture.pixel,
-#            self.video_capture.vga_capture.source,
-#        ]
-#        self.analyzer = LiteScopeAnalyzer(analyzer_signals,
-#            depth        = 512,
-#            clock_domain = "video",
-#            samplerate   = sys_clk_freq,
-#            csr_csv      = "analyzer.csv"
-#        )
+        # VGA Capture.
+        self.vga_capture = VGACapture(
+            vga_ios      = mister.vga,
+            ram_base     = 0x40c0_0000,
+            video_width  = 800,
+            video_height = 480,
+        )
 
         # Video Framebuffer.
         video_timings = ("800x480@60Hz", {
