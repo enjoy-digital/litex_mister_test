@@ -10,6 +10,9 @@ from litex.gen import *
 
 from litex.soc.interconnect.csr import *
 
+from litex.build.sim import SimPlatform
+from litex.build.xilinx import XilinxPlatform
+
 # MiSTeR Top Level ---------------------------------------------------------------------------------
 
 class MiSTeR(LiteXModule):
@@ -40,7 +43,7 @@ class MiSTeR(LiteXModule):
             i_RESET            = ResetSignal("emu"),
 
             # HPS Bus.
-            io_HPS_BUS         = Open(), # FIXME.
+            io_HPS_BUS         = Open(49), # FIXME.
 
             # Video (Generic).
             o_CLK_VIDEO        = vga.clk,
@@ -74,12 +77,12 @@ class MiSTeR(LiteXModule):
             o_BUTTONS          = Open(), # FIXME.
 
             # Audio.
-            i_CLK_AUDIO        = 0,      # FIXME.
-            o_AUDIO_L          = Open(), # FIXME.
-            o_AUDIO_R          = Open(), # FIXME.
-            o_AUDIO_S          = Open(), # FIXME.
-            o_AUDIO_MIX        = Open(), # FIXME.
-            io_ADC_BUS         = Open(), # FIXME.
+            i_CLK_AUDIO        = 0,       # FIXME.
+            o_AUDIO_L          = Open(),  # FIXME.
+            o_AUDIO_R          = Open(),  # FIXME.
+            o_AUDIO_S          = Open(),  # FIXME.
+            o_AUDIO_MIX        = Open(),  # FIXME.
+            io_ADC_BUS         = Open(4), # FIXME.
 
             # SDCard.
             o_SD_SCK           = Open(), # FIXME.
@@ -101,17 +104,17 @@ class MiSTeR(LiteXModule):
             o_DDRAM_WE         = Open(), # FIXME.
 
             # SDRAM.
-            o_SDRAM_CLK        = Open(), # FIXME.
-            o_SDRAM_CKE        = Open(), # FIXME.
-            o_SDRAM_A          = Open(), # FIXME.
-            o_SDRAM_BA         = Open(), # FIXME.
-            io_SDRAM_DQ        = Open(), # FIXME.
-            o_SDRAM_DQML       = Open(), # FIXME.
-            o_SDRAM_DQMH       = Open(), # FIXME.
-            o_SDRAM_nCS        = Open(), # FIXME.
-            o_SDRAM_nCAS       = Open(), # FIXME.
-            o_SDRAM_nRAS       = Open(), # FIXME.
-            o_SDRAM_nWE        = Open(), # FIXME.
+            #o_SDRAM_CLK        = Open(),   # FIXME.
+            #o_SDRAM_CKE        = Open(),   # FIXME.
+            #o_SDRAM_A          = Open(),   # FIXME.
+            #o_SDRAM_BA         = Open(),   # FIXME.
+            #io_SDRAM_DQ        = Open(16), # FIXME.
+            #o_SDRAM_DQML       = Open(),   # FIXME.
+            #o_SDRAM_DQMH       = Open(),   # FIXME.
+            #o_SDRAM_nCS        = Open(),   # FIXME.
+            #o_SDRAM_nCAS       = Open(),   # FIXME.
+            #o_SDRAM_nRAS       = Open(),   # FIXME.
+            #o_SDRAM_nWE        = Open(),   # FIXME.
 
             # UART.
             i_UART_CTS         = 0,      # FIXME.
@@ -135,6 +138,11 @@ class MiSTeR(LiteXModule):
             platform.add_verilog_include_path("Template_MiSTer")
             platform.add_source_dir("Template_MiSTer", recursive=False)
             platform.add_source_dir("Template_MiSTer/rtl")
+            platform.add_source("Template_MiSTer/rtl/cos.init", copy=True)
+            if isinstance(platform, XilinxPlatform):
+                platform.add_source_dir("Template_MiSTer/rtl_xilinx")
+            if isinstance(platform, SimPlatform):
+                platform.add_source_dir("Template_MiSTer/rtl_sim")
         elif core == "memtest":
             platform.add_verilog_include_path("MemTest_MiSTer")
             platform.add_source_dir("MemTest_MiSTer", recursive=False)
