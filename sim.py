@@ -173,6 +173,7 @@ class SimSoC(SoCCore):
         with_gpio             = False,
         sim_debug             = False,
         trace_reset_on        = False,
+        mister_core           = "template",
         **kwargs):
         platform     = Platform()
         sys_clk_freq = int(1e6)
@@ -311,7 +312,7 @@ class SimSoC(SoCCore):
         # MiSTeR -----------------------------------------------------------------------------------
         self.cd_emu = ClockDomain()
         self.comb += self.cd_emu.clk.eq(ClockSignal("sys"))
-        self.mister = mister = MiSTeR(platform, core="template")
+        self.mister = mister = MiSTeR(platform, core=mister_core)
         #self.mister = mister = MiSTeR(platform, core="memtest")
         self.mister.add_control_status_csr()
 
@@ -444,6 +445,7 @@ def main():
     from litex.build.parser import LiteXArgumentParser
     parser = LiteXArgumentParser(description="LiteX SoC Simulation utility")
     parser.set_platform(SimPlatform)
+    parser.add_target_argument("--core",            default="template",  help="MiSTeR core.")
     sim_args(parser)
     args = parser.parse_args()
 
@@ -529,6 +531,7 @@ def main():
         sim_debug              = args.sim_debug,
         trace_reset_on         = int(float(args.trace_start)) > 0 or int(float(args.trace_end)) > 0,
         spi_flash_init         = None if args.spi_flash_init is None else get_mem_data(args.spi_flash_init, endianness="big"),
+        mister_core           = args.core,
         **soc_kwargs)
     if ram_boot_address is not None:
         if ram_boot_address == 0:

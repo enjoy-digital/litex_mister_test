@@ -72,6 +72,7 @@ class BaseSoC(SoCCore):
     def __init__(self, sys_clk_freq=50e6,
         with_etherbone         = True,
         eth_ip                 = "192.168.1.50",
+        mister_core            = "template",
         **kwargs):
         platform = siglent_sds1104xe.Platform()
 
@@ -108,7 +109,7 @@ class BaseSoC(SoCCore):
         self.cd_emu = ClockDomain()
         self.comb += self.cd_emu.clk.eq(ClockSignal("sys"))
         self.comb += self.cd_emu.rst.eq(ResetSignal("sys"))
-        self.mister = mister = MiSTeR(platform, core="template")
+        self.mister = mister = MiSTeR(platform, core=mister_core)
         self.mister.add_control_status_csr()
 
         # Video ------------------------------------------------------------------------------------
@@ -148,12 +149,14 @@ def main():
     parser.add_target_argument("--sys-clk-freq",   default=50e6, type=float, help="System clock frequency.")
     parser.add_target_argument("--with-etherbone", action="store_true",       help="Enable Etherbone support.")
     parser.add_target_argument("--eth-ip",         default="192.168.1.50",     help="Ethernet/Etherbone IP address.")
+    parser.add_target_argument("--core",          default="template",  help="MiSTeR core.")
     args = parser.parse_args()
 
     soc = BaseSoC(
         sys_clk_freq   = args.sys_clk_freq,
         with_etherbone = args.with_etherbone,
         eth_ip         = args.eth_ip,
+        mister_core    = args.core,
         **parser.soc_argdict
     )
 

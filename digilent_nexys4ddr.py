@@ -63,6 +63,7 @@ class BaseSoC(SoCCore):
         with_ethernet          = False,
         with_etherbone         = False,
         with_led_chaser        = True,
+        mister_core            = "template",
         **kwargs):
         platform = digilent_nexys4ddr.Platform()
 
@@ -104,8 +105,7 @@ class BaseSoC(SoCCore):
         self.cd_emu = ClockDomain()
         self.comb += self.cd_emu.clk.eq(ClockSignal("sys"))
         self.comb += self.cd_emu.rst.eq(ResetSignal("sys"))
-        #self.mister = mister = MiSTeR(platform, core="template")
-        self.mister = mister = MiSTeR(platform, core="memtest")
+        self.mister = mister = MiSTeR(platform, core=mister_core)
         self.mister.add_control_status_csr()
 
         # Video ------------------------------------------------------------------------------------
@@ -130,12 +130,14 @@ def main():
     sdopts = parser.target_group.add_mutually_exclusive_group()
     sdopts.add_argument("--with-spi-sdcard",        action="store_true", help="Enable SPI-mode SDCard support.")
     sdopts.add_argument("--with-sdcard",            action="store_true", help="Enable SDCard support.")
+    parser.add_target_argument("--core",            default="template",  help="MiSTeR core.")
     args = parser.parse_args()
 
     soc = BaseSoC(
         sys_clk_freq           = args.sys_clk_freq,
         with_ethernet          = args.with_ethernet,
         with_etherbone         = args.with_etherbone,
+        mister_core            = args.core,
         **parser.soc_argdict
     )
     if args.with_spi_sdcard:

@@ -91,6 +91,7 @@ class BaseSoC(SoCCore):
         with_led_chaser        = True,
         with_sata              = False, sata_gen="gen2",
         vadj                   = "1.2V",
+        mister_core            = "template",
         **kwargs):
         platform = digilent_nexys_video.Platform(toolchain=toolchain)
 
@@ -159,8 +160,7 @@ class BaseSoC(SoCCore):
             self.add_sata(phy=self.sata_phy, mode="read+write")
 
         # MiSTeR -----------------------------------------------------------------------------------
-        #self.mister = mister = MiSTeR(platform, core="template")
-        self.mister = mister = MiSTeR(platform, core="memtest")
+        self.mister = mister = MiSTeR(platform, core=mister_core)
         self.mister.add_control_status_csr()
 
         # Video ------------------------------------------------------------------------------------
@@ -205,6 +205,7 @@ def main():
     parser.add_target_argument("--with-sata",            action="store_true", help="Enable SATA support (over FMCRAID).")
     parser.add_target_argument("--sata-gen",             default="2",         help="SATA Gen.", choices=["1", "2"])
     parser.add_target_argument("--vadj",                 default="1.2V",      help="FMC VADJ value.", choices=["1.2V", "1.8V", "2.5V", "3.3V"])
+    parser.add_target_argument("--core",            default="template",  help="MiSTeR core.")
     args = parser.parse_args()
 
     soc = BaseSoC(
@@ -214,6 +215,7 @@ def main():
         with_sata              = args.with_sata,
         sata_gen               = "gen" + args.sata_gen,
         vadj                   = args.vadj,
+        mister_core            = args.core,
         **parser.soc_argdict
     )
     if args.with_spi_sdcard:

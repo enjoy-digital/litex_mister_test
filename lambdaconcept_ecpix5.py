@@ -84,6 +84,7 @@ class BaseSoC(SoCCore):
         with_ethernet          = False,
         with_etherbone         = False,
         with_led_chaser        = True,
+        mister_core            = "template",
         **kwargs):
         platform = lambdaconcept_ecpix5.Platform(device=device, toolchain=toolchain)
 
@@ -118,7 +119,7 @@ class BaseSoC(SoCCore):
                 self.add_etherbone(phy=self.ethphy)
 
  		# MiSTeR -----------------------------------------------------------------------------------
-        self.mister = mister = MiSTeR(platform, core="template")
+        self.mister = mister = MiSTeR(platform, core=mister_core)
         self.mister.add_control_status_csr()
 
         # Video -------------------------------------------------------------------------------------
@@ -247,7 +248,7 @@ def main():
     ethopts = parser.target_group.add_mutually_exclusive_group()
     ethopts.add_argument("--with-ethernet",  action="store_true", help="Enable Ethernet support.")
     ethopts.add_argument("--with-etherbone", action="store_true", help="Enable Etherbone support.")
-
+    parser.add_target_argument("--core",            default="template",  help="MiSTeR core.")
     args = parser.parse_args()
 
     soc = BaseSoC(
@@ -256,6 +257,7 @@ def main():
         toolchain              = args.toolchain,
         with_ethernet          = args.with_ethernet,
         with_etherbone         = args.with_etherbone,
+        mister_core            = args.core,
         **parser.soc_argdict
     )
     if args.with_sdcard:
