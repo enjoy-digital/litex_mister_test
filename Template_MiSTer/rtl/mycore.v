@@ -1,4 +1,3 @@
-
 module mycore
 (
 	input         clk,

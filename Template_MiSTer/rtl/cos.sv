@@ -1,4 +1,3 @@
-
 module cos (
 	input   [9:0] x,
 	output  [7:0] y
