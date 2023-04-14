@@ -174,6 +174,7 @@ class BaseSoC(SoCCore):
             video_width  = 800,
             video_height = 480,
         )
+        self.bus.add_master(name="vga_capture", master=self.vga_capture.bus)
 
         # Video Framebuffer.
         self.videophy = VideoS7HDMIPHY(platform.request("hdmi_out"), clock_domain="hdmi")

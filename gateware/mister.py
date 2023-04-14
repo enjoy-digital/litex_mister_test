@@ -132,10 +132,10 @@ class MiSTeR(LiteXModule):
             i_status           = control, # FIXME: Name.
         )
         if core == "template":
-            platform.add_verilog_include_path("../Template_MiSTer")
-            platform.add_source_dir("../Template_MiSTer")
-            platform.add_source_dir("../Template_MiSTer/rtl/")
-            platform.add_source_dir("../Template_MiSTer/sys/")
+            platform.add_verilog_include_path("Template_MiSTer")
+            platform.add_source_dir("Template_MiSTer")
+            platform.add_source_dir("Template_MiSTer/rtl/")
+            platform.add_source_dir("Template_MiSTer/sys/")
         else:
             raise NotImplementedError("Unsuported MiSTeR core.")
 
