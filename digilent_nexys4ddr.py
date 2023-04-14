@@ -6,7 +6,7 @@
 # Copyright (c) 2018-2019 Florent Kermarrec <florent@enjoy-digital.fr>
 # SPDX-License-Identifier: BSD-2-Clause
 
-# ./digilent_nexys4ddr.py --cpu-type=None --uart-name=uartbone --csr=csr.csv --build --load
+# ./digilent_nexys4ddr.py --cpu-type=None --uart-name=uartbone --csr-csv=csr.csv --build --load
 # litex_server --uart --uart-port=/dev/ttyUSBX
 # litex_cli --gui (and play with registers :))
 
@@ -103,8 +103,9 @@ class BaseSoC(SoCCore):
         # MiSTeR -----------------------------------------------------------------------------------
         self.cd_emu = ClockDomain()
         self.comb += self.cd_emu.clk.eq(ClockSignal("sys"))
-        self.comb += self.cd_emu.rst.eq(ClockSignal("sys"))
-        self.mister = mister = MiSTeR(platform, core="template")
+        self.comb += self.cd_emu.rst.eq(ResetSignal("sys"))
+        #self.mister = mister = MiSTeR(platform, core="template")
+        self.mister = mister = MiSTeR(platform, core="memtest")
         self.mister.add_control_status_csr()
 
         # Video ------------------------------------------------------------------------------------

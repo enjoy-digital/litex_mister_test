@@ -107,7 +107,7 @@ class BaseSoC(SoCCore):
         # MiSTeR -----------------------------------------------------------------------------------
         self.cd_emu = ClockDomain()
         self.comb += self.cd_emu.clk.eq(ClockSignal("sys"))
-        self.comb += self.cd_emu.rst.eq(ClockSignal("sys"))
+        self.comb += self.cd_emu.rst.eq(ResetSignal("sys"))
         self.mister = mister = MiSTeR(platform, core="template")
         self.mister.add_control_status_csr()
 
