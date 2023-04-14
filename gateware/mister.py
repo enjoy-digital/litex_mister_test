@@ -135,6 +135,10 @@ class MiSTeR(LiteXModule):
             platform.add_verilog_include_path("Template_MiSTer")
             platform.add_source_dir("Template_MiSTer", recursive=False)
             platform.add_source_dir("Template_MiSTer/rtl")
+        elif core == "memtest":
+            platform.add_verilog_include_path("MemTest_MiSTer")
+            platform.add_source_dir("MemTest_MiSTer", recursive=False)
+            platform.add_source_dir("MemTest_MiSTer/rtl")
         else:
             raise NotImplementedError("Unsuported MiSTeR core.")
 
