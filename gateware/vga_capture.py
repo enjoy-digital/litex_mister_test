@@ -69,9 +69,9 @@ class VGACapture(LiteXModule):
             NextState("RUN")
         )
         fsm.act("RUN",
-            vga_mmap.data[ 0: 8].eq(vga_ios.r),
-            vga_mmap.data[ 8:16].eq(vga_ios.g),
-            vga_mmap.data[16:24].eq(vga_ios.b),
+            vga_mmap.data[ 0: 8].eq(vga_ios.r << 3), # 5-bit dynamic.
+            vga_mmap.data[ 8:16].eq(vga_ios.g << 2), # 6-bit dynamic.
+            vga_mmap.data[16:24].eq(vga_ios.b << 3), # 5-bit dynamic.
             If(vga_ios.de,
                 vga_mmap.valid.eq(1),
                 If(vga_pixel >= video_width,
@@ -102,7 +102,7 @@ class VGACapture(LiteXModule):
 
         # DMA.
         # ----
-        self.dma = WishboneDMAWriter(bus=self.bus, with_csr=False)
+        self.dma = WishboneDMAWriter(bus=self.bus, endianness="big", with_csr=False)
 
         # Pipeline.
         # ---------
