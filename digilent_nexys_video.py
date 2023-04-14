@@ -172,8 +172,9 @@ class BaseSoC(SoCCore):
             vga_ios      = mister.vga,
             ram_base     = 0x40c0_0000,
             video_width  = 800,
-            video_height = 480,
+            video_height = 600,
         )
+        self.comb += self.vga_capture.reset.eq(platform.request("user_sw", 0))
         self.bus.add_master(name="vga_capture", master=self.vga_capture.bus)
 
         # Video Framebuffer.
