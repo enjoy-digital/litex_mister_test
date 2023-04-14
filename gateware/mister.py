@@ -43,7 +43,7 @@ class MiSTeR(LiteXModule):
             i_RESET            = ResetSignal("emu"),
 
             # HPS Bus.
-            io_HPS_BUS         = Open(49), # FIXME.
+            io_HPS_BUS         = Open(49) if core == "template" else Open(46), # FIXME.
 
             # Video (Generic).
             o_CLK_VIDEO        = vga.clk,
@@ -147,6 +147,10 @@ class MiSTeR(LiteXModule):
             platform.add_verilog_include_path("MemTest_MiSTer")
             platform.add_source_dir("MemTest_MiSTer", recursive=False)
             platform.add_source_dir("MemTest_MiSTer/rtl")
+            if isinstance(platform, XilinxPlatform):
+                platform.add_source_dir("Template_MiSTer/rtl_xilinx")
+            if isinstance(platform, SimPlatform):
+                platform.add_source_dir("Template_MiSTer/rtl_sim")
         else:
             raise NotImplementedError("Unsuported MiSTeR core.")
 

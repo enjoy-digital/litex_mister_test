@@ -132,7 +132,7 @@ always @ (posedge clk) begin : sdram_block
 	st    <= st + 1'd1;
 	state <= st;
 
-	dram_dq_i <= 16'bZ;
+	//dram_dq_i <= 16'bZ; // FIXME.
 
 	wr <= wr2;
 	wdat_req <= wr2 & ready2;

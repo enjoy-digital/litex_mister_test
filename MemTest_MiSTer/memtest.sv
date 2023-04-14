@@ -203,7 +203,7 @@ assign LED_POWER = 0;
 assign LED_USER  = 0;
 assign BUTTONS   = 0;
 
-wire [31:0] status;
+//wire [31:0] status;
 wire  [1:0] buttons;
 
 `include "build_id.vh"
@@ -539,7 +539,7 @@ vgaout showrez
 );
 
 assign VGA_HS = ~hs;
-assign VGA_VS = ~vs;
+assign VGA_VS = vs; // FIXME: Inverted ???
 
 assign VGA_B  = {4{b}};
 assign VGA_R  = {4{r}};
