@@ -19,6 +19,9 @@
 //  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //============================================================================
 
+`define USE_SDRAM
+`define USE_DDRAM
+
 module emu
 (
 	//Master input clock
@@ -166,7 +169,16 @@ module emu
 	input   [6:0] USER_IN,
 	output  [6:0] USER_OUT,
 
-	input         OSD_STATUS
+	input         OSD_STATUS,
+
+	// FIXME: Added for compilation.
+	output        VGA_DISABLE, // analog out is off
+	input  [11:0] HDMI_WIDTH,
+	input  [11:0] HDMI_HEIGHT,
+	output        HDMI_FREEZE,
+
+	input [127:0] status
+
 );
 
 assign ADC_BUS  = 'Z;
@@ -194,7 +206,7 @@ assign BUTTONS   = 0;
 wire [31:0] status;
 wire  [1:0] buttons;
 
-`include "build_id.v" 
+`include "build_id.vh"
 localparam CONF_STR = 
 {
 	"MEMTEST;;",
@@ -209,95 +221,96 @@ wire [15:0] joystick_0;
 wire  [1:0] sdram_sz;
 reg   [1:0] sdram_chip = 2'h0;
 
-hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
-(
-	.clk_sys(CLK_50M),
-	.HPS_BUS(HPS_BUS),
-
-	.conf_str(CONF_STR),
-	.status(status),
-	.buttons(buttons),
-	.sdram_sz(sdram_sz),
-
-	.joystick_0(joystick_0),
-	.ps2_key(ps2_key),
-	.ps2_kbd_led_use(0),
-	.ps2_kbd_led_status(0)
-);
-
+//hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
+//(
+//	.clk_sys(CLK_50M),
+//	.HPS_BUS(HPS_BUS),
+//
+//	.conf_str(CONF_STR),
+//	.status(status),
+//	.buttons(buttons),
+//	.sdram_sz(sdram_sz),
+//
+//	.joystick_0(joystick_0),
+//	.ps2_key(ps2_key),
+//	.ps2_kbd_led_use(0),
+//	.ps2_kbd_led_status(0)
+//);
 
 ///////////////////////////////////////////////////////////////////
 wire clk_ram, locked;
 
-pll pll
-(
-	.*,
-	.refclk(CLK_50M),
-	.rst(pll_reset | RESET),
-	.outclk_0(clk_ram)
-);
+//pll pll
+//(
+//	.*,
+//	.refclk(CLK_50M),
+//	.rst(pll_reset | RESET),
+//	.outclk_0(clk_ram)
+//);
 
-wire        mgmt_waitrequest;
-reg         mgmt_write;
-reg  [5:0]  mgmt_address;
-reg  [31:0] mgmt_writedata;
-wire [63:0] reconfig_to_pll;
-wire [63:0] reconfig_from_pll;
+assign clk_ram = CLK_50M;
 
-pll_cfg pll_cfg
-(
-	.*,
-	.mgmt_clk(CLK_50M),
-	.mgmt_reset(RESET),
-	.mgmt_read(0),
-	.mgmt_readdata()
-);
+//wire        mgmt_waitrequest;
+//reg         mgmt_write;
+//reg  [5:0]  mgmt_address;
+//reg  [31:0] mgmt_writedata;
+//wire [63:0] reconfig_to_pll;
+//wire [63:0] reconfig_from_pll;
+//
+//pll_cfg pll_cfg
+//(
+//	.*,
+//	.mgmt_clk(CLK_50M),
+//	.mgmt_reset(RESET),
+//	.mgmt_read(0),
+//	.mgmt_readdata()
+//);
 
 reg recfg = 0;
 reg pll_reset = 0;
 
-wire [31:0] cfg_param[152] =
-'{ //      M         K          C
-	'h167, 'h00808, 'hB33332DD, 'h20302,
-	'h160, 'h00808, 'h00000001, 'h20302,
-	'h150, 'h20807, 'h00000001, 'h20302,
-	'h149, 'h00404, 'hF0A3D6B4, 'h20201,
-	'h148, 'h00404, 'hE147ADBF, 'h20201,
-	'h147, 'h00404, 'hD1EB851F, 'h20201,
-	'h146, 'h00404, 'hC28F5C29, 'h20201,
-	'h145, 'h00404, 'hB33332DD, 'h20201,
-	'h144, 'h00404, 'hA3D709E8, 'h20201,
-	'h143, 'h00404, 'h947AE148, 'h20201,
-	'h142, 'h00404, 'h851EB852, 'h20201,
-	'h141, 'h00404, 'h75C28F06, 'h20201,
-	'h140, 'h00707, 'h00000001, 'h20302,
-	'h139, 'h00404, 'h570A3D71, 'h20201,
-	'h138, 'h00404, 'h47AE147B, 'h20201,
-	'h137, 'h00404, 'h3851EA2E, 'h20201,
-	'h136, 'h00404, 'h28F5C239, 'h20201,
-	'h135, 'h00404, 'h1999999A, 'h20201,
-	'h134, 'h00505, 'hB851EB2F, 'h00202,
-	'h133, 'h00505, 'hA3D709E8, 'h00202,
-	'h132, 'h00505, 'h8F5C28F6, 'h00202,
-	'h131, 'h00505, 'h7AE14758, 'h00202,
-	'h130, 'h00505, 'h66666611, 'h00202,
-	'h129, 'h00505, 'h51EB851F, 'h00202,
-	'h128, 'h00505, 'h3D70A381, 'h00202,
-	'h127, 'h00505, 'h28F5C239, 'h00202,
-	'h126, 'h00505, 'h147AE148, 'h00202,
-	'h125, 'h00505, 'h00000001, 'h00202,
-	'h124, 'h20504, 'hEB851E62, 'h00202,
-	'h123, 'h20504, 'hD70A3D71, 'h00202,
-	'h122, 'h20504, 'hC28F5C29, 'h00202,
-	'h121, 'h20504, 'hAE147A8B, 'h00202,
-	'h120, 'h00707, 'h66666611, 'h00303,
-	'h110, 'h20706, 'h333332DD, 'h00303,
-	'h100, 'h00404, 'h00000001, 'h00202,
-	 'h90, 'h00707, 'h66666666, 'h00404,
-	 'h80, 'h00707, 'h66666666, 'h20504,
-	 'h70, 'h00707, 'h00000001, 'h00505
-};
-
+//wire [31:0] cfg_param[152] =
+//'{ //      M         K          C
+//	'h167, 'h00808, 'hB33332DD, 'h20302,
+//	'h160, 'h00808, 'h00000001, 'h20302,
+//	'h150, 'h20807, 'h00000001, 'h20302,
+//	'h149, 'h00404, 'hF0A3D6B4, 'h20201,
+//	'h148, 'h00404, 'hE147ADBF, 'h20201,
+//	'h147, 'h00404, 'hD1EB851F, 'h20201,
+//	'h146, 'h00404, 'hC28F5C29, 'h20201,
+//	'h145, 'h00404, 'hB33332DD, 'h20201,
+//	'h144, 'h00404, 'hA3D709E8, 'h20201,
+//	'h143, 'h00404, 'h947AE148, 'h20201,
+//	'h142, 'h00404, 'h851EB852, 'h20201,
+//	'h141, 'h00404, 'h75C28F06, 'h20201,
+//	'h140, 'h00707, 'h00000001, 'h20302,
+//	'h139, 'h00404, 'h570A3D71, 'h20201,
+//	'h138, 'h00404, 'h47AE147B, 'h20201,
+//	'h137, 'h00404, 'h3851EA2E, 'h20201,
+//	'h136, 'h00404, 'h28F5C239, 'h20201,
+//	'h135, 'h00404, 'h1999999A, 'h20201,
+//	'h134, 'h00505, 'hB851EB2F, 'h00202,
+//	'h133, 'h00505, 'hA3D709E8, 'h00202,
+//	'h132, 'h00505, 'h8F5C28F6, 'h00202,
+//	'h131, 'h00505, 'h7AE14758, 'h00202,
+//	'h130, 'h00505, 'h66666611, 'h00202,
+//	'h129, 'h00505, 'h51EB851F, 'h00202,
+//	'h128, 'h00505, 'h3D70A381, 'h00202,
+//	'h127, 'h00505, 'h28F5C239, 'h00202,
+//	'h126, 'h00505, 'h147AE148, 'h00202,
+//	'h125, 'h00505, 'h00000001, 'h00202,
+//	'h124, 'h20504, 'hEB851E62, 'h00202,
+//	'h123, 'h20504, 'hD70A3D71, 'h00202,
+//	'h122, 'h20504, 'hC28F5C29, 'h00202,
+//	'h121, 'h20504, 'hAE147A8B, 'h00202,
+//	'h120, 'h00707, 'h66666611, 'h00303,
+//	'h110, 'h20706, 'h333332DD, 'h00303,
+//	'h100, 'h00404, 'h00000001, 'h00202,
+//	 'h90, 'h00707, 'h66666666, 'h00404,
+//	 'h80, 'h00707, 'h66666666, 'h20504,
+//	 'h70, 'h00707, 'h00000001, 'h00505
+//};
+//
 reg   [5:0] pos  = 0;
 reg  [15:0] mins = 0;
 reg  [15:0] secs = 0;
@@ -309,75 +322,75 @@ always @(posedge CLK_50M) begin
 	reg        old_stb = 0;
 	reg [15:0] old_joy = 0;
 
-	mgmt_write <= 0;
+//	mgmt_write <= 0;
 
-	if(((locked && !mgmt_waitrequest) || pll_reset) && recfg) begin
-		state <= state + 1'd1;
-		if(!state[2:0]) begin
-			case(state[7:3])
-				// Start
-				0: begin
-						mgmt_address   <= 0;
-						mgmt_writedata <= 0;
-						mgmt_write     <= 1;
-					end
-
-				// M
-				1: begin
-						mgmt_address   <= 4;
-						mgmt_writedata <= cfg_param[{pos, 2'd1}];
-						mgmt_write     <= 1;
-					end
-
-				// K
-				2: begin
-						mgmt_address   <= 7;
-						mgmt_writedata <= cfg_param[{pos, 2'd2}];
-						mgmt_write     <= 1;
-					end
-
-				// N
-				3: begin
-						mgmt_address   <= 3;
-						mgmt_writedata <= 'h10000;
-						mgmt_write     <= 1;
-					end
-
-				// C0
-				4: begin
-						mgmt_address   <= 5;
-						mgmt_writedata <= cfg_param[{pos, 2'd3}];
-						mgmt_write     <= 1;
-					end
-
-				// Charge pump
-				5: begin
-						mgmt_address   <= 9;
-						mgmt_writedata <= 1;
-						mgmt_write     <= 1;
-					end
-
-				// Bandwidth
-				6: begin
-						mgmt_address   <= 8;
-						mgmt_writedata <= 7;
-						mgmt_write     <= 1;
-					end
-
-				// Apply
-				7: begin
-						mgmt_address   <= 2;
-						mgmt_writedata <= 0;
-						mgmt_write     <= 1;
-					end
-
-				8: pll_reset <= 1;
-				9: pll_reset <= 0;
-
-				10: recfg <= 0;
-			endcase
-		end
-	end
+//	if(((locked && !mgmt_waitrequest) || pll_reset) && recfg) begin
+//		state <= state + 1'd1;
+//		if(!state[2:0]) begin
+//			case(state[7:3])
+//				// Start
+//				0: begin
+//						mgmt_address   <= 0;
+//						mgmt_writedata <= 0;
+//						mgmt_write     <= 1;
+//					end
+//
+//				// M
+//				1: begin
+//						mgmt_address   <= 4;
+//						mgmt_writedata <= cfg_param[{pos, 2'd1}];
+//						mgmt_write     <= 1;
+//					end
+//
+//				// K
+//				2: begin
+//						mgmt_address   <= 7;
+//						mgmt_writedata <= cfg_param[{pos, 2'd2}];
+//						mgmt_write     <= 1;
+//					end
+//
+//				// N
+//				3: begin
+//						mgmt_address   <= 3;
+//						mgmt_writedata <= 'h10000;
+//						mgmt_write     <= 1;
+//					end
+//
+//				// C0
+//				4: begin
+//						mgmt_address   <= 5;
+//						mgmt_writedata <= cfg_param[{pos, 2'd3}];
+//						mgmt_write     <= 1;
+//					end
+//
+//				// Charge pump
+//				5: begin
+//						mgmt_address   <= 9;
+//						mgmt_writedata <= 1;
+//						mgmt_write     <= 1;
+//					end
+//
+//				// Bandwidth
+//				6: begin
+//						mgmt_address   <= 8;
+//						mgmt_writedata <= 7;
+//						mgmt_write     <= 1;
+//					end
+//
+//				// Apply
+//				7: begin
+//						mgmt_address   <= 2;
+//						mgmt_writedata <= 0;
+//						mgmt_write     <= 1;
+//					end
+//
+//				8: pll_reset <= 1;
+//				9: pll_reset <= 0;
+//
+//				10: recfg <= 0;
+//			endcase
+//		end
+//	end
 
 	if(recfg) begin
 		{min, mins} <= 0;
@@ -443,7 +456,7 @@ always @(posedge CLK_50M) begin
 		recfg <= 1;
 		pos <= pos + 1'd1;
 	end
-	
+
 	if(status[0] | buttons[1]) begin
 		recfg <= 1;
 		pos <= 0;
@@ -494,7 +507,7 @@ tester my_memtst
 ///////////////////////////////////////////////////////////////////
 wire videoclk;
 
-vpll vpll
+pll vpll
 (
 	.refclk(CLK_50M),
 	.rst(0),
@@ -513,7 +526,8 @@ vgaout showrez
 	.rez2(failcount),
 	.rez3((sdram_sz == 3) ? ~sdram_chip : 2'b00),
 	.bg(6'b000001),
-	.freq(16'hF000 | cfg_param[{pos, 2'd0}][11:0]),
+	//.freq(16'hF000 | cfg_param[{pos, 2'd0}][11:0]),
+	.freq(16'hF000),
 	.elapsed(mins),
 	.mark(8'h80 >> {~auto, secs[2:0]}),
 	.hs(hs),

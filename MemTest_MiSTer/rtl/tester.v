@@ -136,7 +136,7 @@ end
 
 // FSM controller
 reg sdram_rst_n = 0;
-always @(posedge clk) begin
+always @(posedge clk) begin : tester_block
 	reg        check_in_progress; // when 1 - enables errors checking
 	reg        reset_req = 1;
 	reg [31:0] rst_cnt;

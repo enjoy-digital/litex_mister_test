@@ -61,7 +61,7 @@ module sdram
 	output            DRAM_CS_N,
 	output            DRAM_BA_0,
 	output            DRAM_BA_1,
-	inout  reg [15:0] DRAM_DQ,
+	inout      [15:0] DRAM_DQ,
 	output     [12:0] DRAM_ADDR
 );
 
@@ -110,7 +110,12 @@ end
 
 reg [2:0] state;
 reg       wr,rd,wr2,done2;
-always @ (posedge clk) begin
+
+reg [15:0] dram_dq_i;
+
+assign DRAM_DQ = dram_dq_i;
+
+always @ (posedge clk) begin : sdram_block
 	reg  [9:0] cas_addr, cas_addr2;
 	reg [23:0] addr, addr2, addr3; // x4
 	reg  [5:0] rcnt = 0;
@@ -127,11 +132,11 @@ always @ (posedge clk) begin
 	st    <= st + 1'd1;
 	state <= st;
 
-	DRAM_DQ <= 16'bZ;
+	dram_dq_i <= 16'bZ;
 
 	wr <= wr2;
 	wdat_req <= wr2 & ready2;
-	if(wdat_req) DRAM_DQ <= wdat;
+	if(wdat_req) dram_dq_i <= wdat;
 
 	rdat3   <= DRAM_DQ;
 	rdat2   <= rdat3;
@@ -247,29 +252,31 @@ always @ (posedge clk) begin
 	done <= done2;
 end
 
-altddio_out
-#(
-	.extend_oe_disable("OFF"),
-	.intended_device_family("Cyclone V"),
-	.invert_output("OFF"),
-	.lpm_hint("UNUSED"),
-	.lpm_type("altddio_out"),
-	.oe_reg("UNREGISTERED"),
-	.power_up_high("OFF"),
-	.width(1)
-)
-sdramclk_ddr
-(
-	.datain_h(1'b0),
-	.datain_l(1'b1),
-	.outclock(clk),
-	.dataout(DRAM_CLK),
-	.aclr(1'b0),
-	.aset(1'b0),
-	.oe(1'b1),
-	.outclocken(1'b1),
-	.sclr(1'b0),
-	.sset(1'b0)
-);
+assign DRAM_CLK = clk; // FIXME: For compilation.
+
+//altddio_out
+//#(
+//	.extend_oe_disable("OFF"),
+//	.intended_device_family("Cyclone V"),
+//	.invert_output("OFF"),
+//	.lpm_hint("UNUSED"),
+//	.lpm_type("altddio_out"),
+//	.oe_reg("UNREGISTERED"),
+//	.power_up_high("OFF"),
+//	.width(1)
+//)
+//sdramclk_ddr
+//(
+//	.datain_h(1'b0),
+//	.datain_l(1'b1),
+//	.outclock(clk),
+//	.dataout(DRAM_CLK),
+//	.aclr(1'b0),
+//	.aset(1'b0),
+//	.oe(1'b1),
+//	.outclocken(1'b1),
+//	.sclr(1'b0),
+//	.sset(1'b0)
+//);
 
 endmodule
