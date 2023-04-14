@@ -159,7 +159,8 @@ class BaseSoC(SoCCore):
             self.add_sata(phy=self.sata_phy, mode="read+write")
 
         # MiSTeR -----------------------------------------------------------------------------------
-        self.mister = mister = MiSTeR(platform, core="template")
+        #self.mister = mister = MiSTeR(platform, core="template")
+        self.mister = mister = MiSTeR(platform, core="memtest")
         self.mister.add_control_status_csr()
 
         # Video ------------------------------------------------------------------------------------
