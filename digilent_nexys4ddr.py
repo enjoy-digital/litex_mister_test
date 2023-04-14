@@ -101,6 +101,9 @@ class BaseSoC(SoCCore):
                 sys_clk_freq = sys_clk_freq)
 
         # MiSTeR -----------------------------------------------------------------------------------
+        self.cd_emu = ClockDomain()
+        self.comb += self.cd_emu.clk.eq(ClockSignal("sys"))
+        self.comb += self.cd_emu.rst.eq(ClockSignal("sys"))
         self.mister = mister = MiSTeR(platform, core="template")
         self.mister.add_control_status_csr()
 
@@ -109,9 +112,9 @@ class BaseSoC(SoCCore):
         self.comb += [
             vga_pads.hsync_n.eq(mister.vga.hsync_n),
             vga_pads.vsync_n.eq(mister.vga.vsync_n),
-            vga_pads.r.eq(mister.vga.r),
-            vga_pads.g.eq(mister.vga.g),
-            vga_pads.b.eq(mister.vga.b),
+            vga_pads.r.eq(mister.vga.r << 3),
+            vga_pads.g.eq(mister.vga.g << 2),
+            vga_pads.b.eq(mister.vga.b << 3),
         ]
 
 # Build --------------------------------------------------------------------------------------------
