@@ -47,6 +47,9 @@ from litex.soc.cores.video import VideoGenericPHY
 
 from litescope import LiteScopeAnalyzer
 
+from gateware.mister import MiSTeR
+from gateware.vga_capture import VGACapture
+
 # IOs ----------------------------------------------------------------------------------------------
 
 _io = [
@@ -168,8 +171,6 @@ class SimSoC(SoCCore):
         with_spi_flash        = False,
         spi_flash_init        = [],
         with_gpio             = False,
-        with_video_framebuffer = False,
-        with_video_terminal = False,
         sim_debug             = False,
         trace_reset_on        = False,
         **kwargs):
@@ -306,16 +307,24 @@ class SimSoC(SoCCore):
             self.gpio = GPIOTristate(platform.request("gpio"), with_irq=True)
             self.irq.add("gpio", use_loc_if_exists=True)
 
-        # Video Framebuffer ------------------------------------------------------------------------
-        if with_video_framebuffer:
-            video_pads = platform.request("vga")
-            self.submodules.videophy = VideoGenericPHY(video_pads)
-            self.add_video_framebuffer(phy=self.videophy, timings="640x480@60Hz", format="rgb888")
 
-        # Video Terminal ---------------------------------------------------------------------------
-        if with_video_terminal:
-            self.submodules.videophy = VideoGenericPHY(platform.request("vga"))
-            self.add_video_terminal(phy=self.videophy, timings="640x480@60Hz")
+        # MiSTeR -----------------------------------------------------------------------------------
+        self.cd_emu = ClockDomain()
+        self.comb += self.cd_emu.clk.eq(ClockSignal("sys"))
+        self.mister = mister = MiSTeR(platform, core="template")
+        #self.mister = mister = MiSTeR(platform, core="memtest")
+        self.mister.add_control_status_csr()
+
+        # Video ------------------------------------------------------------------------------------
+        vga_pads = platform.request("vga")
+        self.comb += [
+            vga_pads.hsync.eq(mister.vga.hsync_n),
+            vga_pads.vsync.eq(mister.vga.vsync_n),
+            vga_pads.de.eq(mister.vga.de),
+            vga_pads.r.eq(mister.vga.r << 3),
+            vga_pads.g.eq(mister.vga.g << 2),
+            vga_pads.b.eq(mister.vga.b << 3),
+        ]
 
         # Simulation debugging ----------------------------------------------------------------------
         if sim_debug:
@@ -426,10 +435,6 @@ def sim_args(parser):
     # Analyzer.
     parser.add_argument("--with-analyzer",        action="store_true",     help="Enable Analyzer support.")
 
-    # Video.
-    parser.add_argument("--with-video-framebuffer", action="store_true",   help="Enable Video Framebuffer.")
-    parser.add_argument("--with-video-terminal",    action="store_true",   help="Enable Video Terminal.")
-
     # Debug/Waveform.
     parser.add_argument("--sim-debug",            action="store_true",     help="Add simulation debugging modules.")
     parser.add_argument("--gtkwave-savefile",     action="store_true",     help="Generate GTKWave savefile.")
@@ -507,8 +512,7 @@ def main():
         sim_config.add_module("spdeeprom", "i2c")
 
     # Video.
-    if args.with_video_framebuffer or args.with_video_terminal:
-        sim_config.add_module("video", "vga")
+    sim_config.add_module("video", "vga")
 
     # SoC ------------------------------------------------------------------------------------------
     soc = SimSoC(
@@ -522,8 +526,6 @@ def main():
         with_sdcard            = args.with_sdcard,
         with_spi_flash         = args.with_spi_flash,
         with_gpio              = args.with_gpio,
-        with_video_framebuffer = args.with_video_framebuffer,
-        with_video_terminal    = args.with_video_terminal,
         sim_debug              = args.sim_debug,
         trace_reset_on         = int(float(args.trace_start)) > 0 or int(float(args.trace_end)) > 0,
         spi_flash_init         = None if args.spi_flash_init is None else get_mem_data(args.spi_flash_init, endianness="big"),
@@ -547,7 +549,7 @@ def main():
     builder.build(
         sim_config       = sim_config,
         interactive      = not args.non_interactive,
-        video            = args.with_video_framebuffer or args.with_video_terminal,
+        video            = True,
         pre_run_callback = pre_run_callback,
         **parser.toolchain_argdict,
     )
