@@ -322,9 +322,9 @@ class SimSoC(SoCCore):
             vga_pads.hsync.eq(mister.vga.hsync_n),
             vga_pads.vsync.eq(mister.vga.vsync_n),
             vga_pads.de.eq(mister.vga.de),
-            vga_pads.r.eq(mister.vga.r << 3),
-            vga_pads.g.eq(mister.vga.g << 2),
-            vga_pads.b.eq(mister.vga.b << 3),
+            vga_pads.r.eq(mister.vga.r[::-1]),
+            vga_pads.g.eq(mister.vga.g[::-1]),
+            vga_pads.b.eq(mister.vga.b[::-1]),
         ]
 
         # Simulation debugging ----------------------------------------------------------------------
