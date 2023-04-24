@@ -3,7 +3,7 @@ module cos (
 	output  [7:0] y
 );
 
-wire [7:0] qcos[0:255];
+reg [7:0] qcos[0:255];
 initial begin
 	$readmemh("cos.init", qcos);
 end
