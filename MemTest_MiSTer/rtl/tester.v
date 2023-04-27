@@ -136,11 +136,12 @@ end
 
 // FSM controller
 reg sdram_rst_n = 0;
-always @(posedge clk) begin : tester_block
-	reg        check_in_progress; // when 1 - enables errors checking
-	reg        reset_req = 1;
-	reg [31:0] rst_cnt;
 
+reg        check_in_progress; // when 1 - enables errors checking
+reg        reset_req = 1;
+reg [31:0] rst_cnt;
+
+always @(posedge clk) begin : tester_block
 	if (check_in_progress & dram_ready & (dram_rdat!=rnd_out)) failcount <= failcount + 1;
 	 
 	curr_state <= ( reset_req & dram_done ) ? RESET : next_state;

@@ -316,12 +316,12 @@ reg  [15:0] mins = 0;
 reg  [15:0] secs = 0;
 reg         auto = 0;
 
-always @(posedge CLK_50M) begin
-	reg  [7:0] state = 0;
-	integer    min = 0, sec = 0;
-	reg        old_stb = 0;
-	reg [15:0] old_joy = 0;
+reg  [7:0] state = 0;
+integer    min = 0, sec = 0;
+reg        old_stb = 0;
+reg [15:0] old_joy = 0;
 
+always @(posedge CLK_50M) begin
 //	mgmt_write <= 0;
 
 //	if(((locked && !mgmt_waitrequest) || pll_reset) && recfg) begin

@@ -115,20 +115,20 @@ reg [15:0] dram_dq_i;
 
 assign DRAM_DQ = dram_dq_i;
 
-always @ (posedge clk) begin : sdram_block
-	reg  [9:0] cas_addr, cas_addr2;
-	reg [23:0] addr, addr2, addr3; // x4
-	reg  [5:0] rcnt = 0;
-	reg        rnw_reg;
-	reg  [1:0] rfsh;
-	reg [15:0] rdat2,rdat3;
-	reg        done3;
-	reg [4:0]  is, is2, is3;
-	reg [2:0]  st;
-	reg        id;
-	reg [2:0]  cas_cmd, cas_cmd2;
-	reg        wdat_req;
+reg  [9:0] cas_addr, cas_addr2;
+reg [23:0] addr, addr2, addr3; // x4
+reg  [5:0] rcnt = 0;
+reg        rnw_reg;
+reg  [1:0] rfsh;
+reg [15:0] rdat2,rdat3;
+reg        done3;
+reg [4:0]  is, is2, is3;
+reg [2:0]  st;
+reg        id;
+reg [2:0]  cas_cmd, cas_cmd2;
+reg        wdat_req;
 
+always @ (posedge clk) begin : sdram_block
 	st    <= st + 1'd1;
 	state <= st;
 
