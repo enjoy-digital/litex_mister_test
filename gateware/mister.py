@@ -10,8 +10,9 @@ from litex.gen import *
 
 from litex.soc.interconnect.csr import *
 
-from litex.build.sim import SimPlatform
-from litex.build.xilinx import XilinxPlatform
+from litex.build.sim     import SimPlatform
+from litex.build.xilinx  import XilinxPlatform
+from litex.build.lattice import LatticePlatform
 
 # MiSTeR Top Level ---------------------------------------------------------------------------------
 
@@ -141,6 +142,8 @@ class MiSTeR(LiteXModule):
             platform.add_source("Template_MiSTer/rtl/cos.init", copy=True)
             if isinstance(platform, XilinxPlatform):
                 platform.add_source_dir("Template_MiSTer/rtl_xilinx")
+            if isinstance(platform, LatticePlatform):
+                platform.add_source_dir("Template_MiSTer/rtl_lattice")
             if isinstance(platform, SimPlatform):
                 platform.add_source_dir("Template_MiSTer/rtl_sim")
         elif core == "memtest":
@@ -149,6 +152,8 @@ class MiSTeR(LiteXModule):
             platform.add_source_dir("MemTest_MiSTer/rtl")
             if isinstance(platform, XilinxPlatform):
                 platform.add_source_dir("Template_MiSTer/rtl_xilinx")
+            if isinstance(platform, LatticePlatform):
+                platform.add_source_dir("Template_MiSTer/rtl_lattice")
             if isinstance(platform, SimPlatform):
                 platform.add_source_dir("Template_MiSTer/rtl_sim")
         else:
