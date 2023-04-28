@@ -26,6 +26,7 @@ from litex.soc.integration.builder import *
 from litex.soc.integration.soc import *
 from litex.soc.cores.bitbang import *
 from litex.soc.cores.cpu import CPUS
+from litex.soc.cores.video import VideoTimingGenerator, ColorBarsPattern
 
 from litedram import modules as litedram_modules
 from litedram.modules import parse_spd_hexdump
@@ -151,9 +152,49 @@ class SimSoC(SoCCore):
         # MiSTeR -----------------------------------------------------------------------------------
         self.cd_emu = ClockDomain()
         self.comb += self.cd_emu.clk.eq(ClockSignal("sys"))
-        self.mister = mister = MiSTeR(platform, core=mister_core)
-        #self.mister = mister = MiSTeR(platform, core="memtest")
-        self.mister.add_control_status_csr()
+
+        source_r  = Signal(8)
+        source_g  = Signal(8)
+        source_b  = Signal(8)
+        source_hs = Signal()
+        source_vs = Signal()
+        source_de = Signal()
+
+        test_pattern = True
+        if test_pattern:
+            # Video Timing Generator.
+            vtg = VideoTimingGenerator(default_video_timings="640x480@60Hz")
+            vtg = ClockDomainsRenamer("sys")(vtg)
+            self.add_module(name="vtg", module=vtg)
+
+            # ColorsBars Pattern.
+            colorbars = ClockDomainsRenamer("sys")(ColorBarsPattern())
+            self.add_module(name="colorbars", module=colorbars)
+
+            # Connect Video Timing Generator to ColorsBars Pattern.
+            self.comb += [
+                vtg.source.connect(colorbars.vtg_sink),
+                colorbars.source.ready.eq(1),
+
+                source_r        .eq(colorbars.source.r),
+                source_g        .eq(colorbars.source.g),
+                source_b        .eq(colorbars.source.b),
+                source_hs       .eq(colorbars.source.hsync),
+                source_vs       .eq(colorbars.source.vsync),
+                source_de       .eq(colorbars.source.de),
+            ]
+        else:
+            self.mister = mister = MiSTeR(platform, core=mister_core)
+            #self.mister = mister = MiSTeR(platform, core="memtest")
+            self.mister.add_control_status_csr()
+            self.comb += [
+                source_r    .eq(mister.vga.r[::-1]),
+                source_g    .eq(mister.vga.g[::-1]),
+                source_b    .eq(mister.vga.b[::-1]),
+                source_hs   .eq(mister.vga.hsync_n),
+                source_vs   .eq(mister.vga.vsync_n),
+                source_de   .eq(mister.vga.de),
+            ]
 
         self.submodules.ascal = VHD2VConverter(platform,
             top_entity    = "ascal",
@@ -162,12 +203,12 @@ class SimSoC(SoCCore):
             files = ['ascal.vhd'],
             params = dict(
                 p_RAMBASE = 0x0,
-                p_N_AW = 28,
-                p_N_DW = 128,
+                p_N_AW    = 28,
+                p_N_DW    = 128,
                 p_N_BURST = 128
             )
         )
-        
+
         WIDTH   = 1920
         HFP     = 88
         HS      = 48
@@ -196,13 +237,13 @@ class SimSoC(SoCCore):
         	i_vimax    = 0,
 
             # video input
-            i_i_r   = mister.vga.r[::-1],
-            i_i_g   = mister.vga.g[::-1],
-            i_i_b   = mister.vga.b[::-1],
-            i_i_hs  = mister.vga.hsync_n,
-            i_i_vs  = mister.vga.vsync_n,
+            i_i_r   = source_r,
+            i_i_g   = source_g,
+            i_i_b   = source_b,
+            i_i_hs  = source_hs,
+            i_i_vs  = source_vs,
+            i_i_de  = source_de,
             i_i_fl  = 0,
-            i_i_de  = mister.vga.de,
             i_i_ce  = 1,
             i_i_clk = ClockSignal(),
 
@@ -231,7 +272,7 @@ class SimSoC(SoCCore):
 	        i_vsstart  = HEIGHT + VFP,
 	        i_vsend    = HEIGHT + VFP + VS & 0xfff,
 	        i_vdisp    = HEIGHT,
-	        i_vmin     = 0,       # TODO: What should go here?  
+	        i_vmin     = 0,       # TODO: What should go here?
 	        i_vmax     = HEIGHT,  # TODO: What should go here?
 	        i_vrr      = 0,       # TODO: What should go here?
 	        i_vrrmax   = HEIGHT + VBP + VS & 0xfff + 1,
@@ -253,14 +294,14 @@ class SimSoC(SoCCore):
 
             i_avl_clk           = ClockSignal(),
             i_avl_waitrequest   = avl2wb.avalon.waitrequest,
-            i_avl_readdata      = avl2wb.avalon.readdata,    
-            i_avl_readdatavalid = avl2wb.avalon.readdatavalid,        
-            o_avl_burstcount    = avl2wb.avalon.burstcount,        
-            o_avl_writedata     = avl2wb.avalon.writedata,    
-            o_avl_address       = avl2wb.avalon.address,    
+            i_avl_readdata      = avl2wb.avalon.readdata,
+            i_avl_readdatavalid = avl2wb.avalon.readdatavalid,
+            o_avl_burstcount    = avl2wb.avalon.burstcount,
+            o_avl_writedata     = avl2wb.avalon.writedata,
+            o_avl_address       = avl2wb.avalon.address,
             o_avl_write         = avl2wb.avalon.write,
             o_avl_read          = avl2wb.avalon.read,
-            o_avl_byteenable    = avl2wb.avalon.byteenable,        
+            o_avl_byteenable    = avl2wb.avalon.byteenable,
         )
 
         # Video ------------------------------------------------------------------------------------
