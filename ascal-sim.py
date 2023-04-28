@@ -17,6 +17,7 @@ from migen import *
 from litex.build.generic_platform import *
 from litex.build.sim import SimPlatform
 from litex.build.sim.config import SimConfig
+from litex.build.vhd2v_converter import *
 
 from litex.soc.interconnect.avalon import AvalonMM2Wishbone
 from litex.soc.integration.common import *
@@ -154,7 +155,18 @@ class SimSoC(SoCCore):
         #self.mister = mister = MiSTeR(platform, core="memtest")
         self.mister.add_control_status_csr()
 
-        platform.add_source("ascal.v")
+        self.submodules.ascal = VHD2VConverter(platform,
+            top_entity    = "ascal",
+            build_dir     = os.path.abspath(os.path.dirname(__file__)),
+            force_convert = True,
+            files = ['ascal.vhd'],
+            params = dict(
+                p_RAMBASE = 0x0,
+                p_N_AW = 28,
+                p_N_DW = 128,
+                p_N_BURST = 128
+            )
+        )
         
         WIDTH   = 1920
         HFP     = 88
@@ -263,10 +275,7 @@ class SimSoC(SoCCore):
         ]
 
         # Simulation debugging ----------------------------------------------------------------------
-        if False:
-            platform.add_debug(self, reset=1 if trace_reset_on else 0)
-        else:
-            self.comb += platform.trace.eq(1)
+        platform.add_debug(self, reset=1 if trace_reset_on else 0)
 
 # Build --------------------------------------------------------------------------------------------
 
@@ -374,7 +383,7 @@ def main():
 
     # SoC ------------------------------------------------------------------------------------------
     soc = SimSoC(
-        trace_reset_on         = int(float(args.trace_start)) > 0 or int(float(args.trace_end)) > 0,
+        trace_reset_on        = int(float(args.trace_start)) > 0 or int(float(args.trace_end)) > 0,
         mister_core           = args.core,
         **soc_kwargs)
     if ram_boot_address is not None:
