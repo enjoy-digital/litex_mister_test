@@ -129,17 +129,12 @@ class SimSoC(SoCCore):
             l2_cache_reverse        = False,
             with_bist               = 0
         )
-        if sdram_init != []:
-            # Skip SDRAM test to avoid corrupting pre-initialized contents.
-            self.add_constant("SDRAM_TEST_DISABLE")
-        else:
-            # Reduce memtest size for simulation speedup
-            self.add_constant("MEMTEST_DATA_SIZE", 8*1024)
-            self.add_constant("MEMTEST_ADDR_SIZE", 8*1024)
+
+        self.add_constant("SDRAM_TEST_DISABLE")
 
         self.submodules.avl2wb = avl2wb = AvalonMM2Wishbone(
             data_width=128, address_width=28,
-            wishbone_base_address=0x40000000,
+            wishbone_base_address=0x4000000,
             # wishbone address bus is 32 bits, word addressed
             # since ascal has max 28 bits avalon address, that gives 24 wishbone
             # bits, because data width is 128
