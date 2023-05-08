@@ -198,20 +198,21 @@ class SimSoC(SoCCore):
             files = ['ascal.vhd'],
             params = dict(
                 p_RAMBASE = 0x0,
+                p_PALETTE2 = "false",
                 p_N_AW    = 28,
                 p_N_DW    = 128,
                 p_N_BURST = 128
             )
         )
 
-        WIDTH   = 1920
-        HFP     = 88
-        HS      = 48
-        HBP     = 148
-        HEIGHT  = 1080
-        VFP     = 4
+        WIDTH   = 1280
+        HFP     = 110
+        HS      = 40
+        HBP     = 220
+        HEIGHT  = 720
+        VFP     = 5
         VS      = 5
-        VBP     = 36
+        VBP     = 20
         HDMI_PR = 0
 
         vga_out_r  = Signal(8)
@@ -257,20 +258,20 @@ class SimSoC(SoCCore):
             o_o_lltune = Open(),
 
             # operational parameters
-	        i_htotal   = WIDTH + HFP + HBP + HS & 0xfff,
+	        i_htotal   = WIDTH + HFP + HBP + HS,
 	        i_hsstart  = WIDTH + HFP,
-	        i_hsend    = WIDTH + HFP + HS & 0xfff,
+	        i_hsend    = WIDTH + HFP + HS,
 	        i_hdisp    = WIDTH,
 	        i_hmin     = 0,      # TODO: What should go here?
 	        i_hmax     = WIDTH,  # TODO: What should go here?
-	        i_vtotal   = HEIGHT + VFP + VBP + VS & 0xfff,
+	        i_vtotal   = HEIGHT + VFP + VBP + VS,
 	        i_vsstart  = HEIGHT + VFP,
-	        i_vsend    = HEIGHT + VFP + VS & 0xfff,
+	        i_vsend    = HEIGHT + VFP + VS,
 	        i_vdisp    = HEIGHT,
 	        i_vmin     = 0,       # TODO: What should go here?
 	        i_vmax     = HEIGHT,  # TODO: What should go here?
-	        i_vrr      = 0,       # TODO: What should go here?
-	        i_vrrmax   = HEIGHT + VBP + VS & 0xfff + 1,
+	        i_vrr      = 0,       # 
+	        i_vrrmax   = HEIGHT + VBP + VS + 1,
 
             i_mode     = Constant(0, 4),
 
