@@ -142,7 +142,7 @@ class SimSoC(SoCCore):
             wishbone_extend_address_bits=8,
             avoid_combinatorial_loop=False)
 
-        self.bus.add_master("mistex", avl2wb.wishbone)
+        self.bus.add_master("mistex", avl2wb.a2w_wb)
 
         # MiSTeR -----------------------------------------------------------------------------------
         self.cd_emu = ClockDomain()
@@ -288,15 +288,15 @@ class SimSoC(SoCCore):
             # avalon interface
 
             i_avl_clk           = ClockSignal(),
-            i_avl_waitrequest   = avl2wb.avalon.waitrequest,
-            i_avl_readdata      = avl2wb.avalon.readdata,
-            i_avl_readdatavalid = avl2wb.avalon.readdatavalid,
-            o_avl_burstcount    = avl2wb.avalon.burstcount,
-            o_avl_writedata     = avl2wb.avalon.writedata,
-            o_avl_address       = avl2wb.avalon.address,
-            o_avl_write         = avl2wb.avalon.write,
-            o_avl_read          = avl2wb.avalon.read,
-            o_avl_byteenable    = avl2wb.avalon.byteenable,
+            i_avl_waitrequest   = avl2wb.a2w_avl.waitrequest,
+            i_avl_readdata      = avl2wb.a2w_avl.readdata,
+            i_avl_readdatavalid = avl2wb.a2w_avl.readdatavalid,
+            o_avl_burstcount    = avl2wb.a2w_avl.burstcount,
+            o_avl_writedata     = avl2wb.a2w_avl.writedata,
+            o_avl_address       = avl2wb.a2w_avl.address,
+            o_avl_write         = avl2wb.a2w_avl.write,
+            o_avl_read          = avl2wb.a2w_avl.read,
+            o_avl_byteenable    = avl2wb.a2w_avl.byteenable,
         )
 
         # Video ------------------------------------------------------------------------------------
