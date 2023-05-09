@@ -75,7 +75,97 @@ class Platform(SimPlatform):
     def __init__(self):
         SimPlatform.__init__(self, "SIM", _io)
 
+# CRG -----------------------------------------------------------------------------------------
+
+class _CRG(Module):
+    def __init__(self, clk, rst=0):
+        self.clock_domains.cd_sys    = ClockDomain()
+        self.clock_domains.cd_por    = ClockDomain(reset_less=True)
+        self.clock_domains.cd_emu    = ClockDomain()
+        self.clock_domains.cd_lowres = ClockDomain()
+        self.clock_domains.cd_hdmi   = ClockDomain()
+
+        if hasattr(clk, "p"):
+            clk_se = Signal()
+            self.specials += DifferentialInput(clk.p, clk.n, clk_se)
+            clk = clk_se
+
+        # CLK = 100MHz
+        clk_retro  = Signal()
+        clk_lowres = Signal()
+        clk_hdmi   = Signal()
+
+        clk_div2          = Signal(reset=1) # 50 MHz
+        clk_div4          = Signal(reset=1) # 25 MHz
+        clk_div4_counter  = Signal()
+
+        clk_div20         = Signal(reset=1) # 5 MHz
+        clk_div20_counter = Signal(4)
+
+        self.sync += [
+            clk_div2.eq(~clk_div2),
+            clk_div4_counter.eq(clk_div4_counter + 1),
+            If(clk_div4_counter, clk_div4.eq(~clk_div4)),
+            If(clk_div20_counter == 9,
+                clk_div20_counter.eq(0),
+                clk_div20.eq(~clk_div20))
+            .Else(clk_div20_counter.eq(clk_div20_counter + 1)),
+        ]
+
+        # Power on Reset (vendor agnostic)
+        int_rst = Signal(reset=1)
+        self.sync.por += int_rst.eq(rst)
+        self.comb += [
+            self.cd_sys    .clk.eq(clk),
+            self.cd_sys    .rst.eq(int_rst),
+            self.cd_por    .clk.eq(clk),
+
+            self.cd_emu    .clk.eq(clk_div2),
+            self.cd_lowres .clk.eq(clk_div20),
+            self.cd_hdmi   .clk.eq(clk_div4),
+        ]
+
 # Simulation SoC -----------------------------------------------------------------------------------
+
+modes = {
+    "lowres" : {
+        "pix_clk"       : 5e6,
+        "h_active"      : 320,
+        "h_blanking"    : 80,
+        "h_sync_offset" : 8,
+        "h_sync_width"  : 32,
+        "v_active"      : 200,
+        "v_blanking"    : 15,
+        "v_sync_offset" : 3,
+        "v_sync_width"  : 6,
+    },
+    "midres" : {
+        "pix_clk"          : 25e6,
+        "h_active"         : 1024,
+        "h_blanking"       : 80,
+        "h_sync_offset"    : 8,
+        "h_sync_width"     : 32,
+        "h_sync_backporch" : 40,
+        "v_active"         : 768,
+        "v_blanking"       : 15,
+        "v_sync_offset"    : 1,
+        "v_sync_width"     : 8,
+        "v_sync_backporch" : 6,
+    },
+    "highres": {
+        "pix_clk"          : 100e6,
+        "h_active"         : 1280,
+        "h_blanking"       : 80,
+        "h_sync_offset"    : 110,
+        "h_sync_width"     : 40,
+        "h_sync_backporch" : 220,
+        "v_active"         : 720,
+        "v_blanking"       : 34,
+        "v_sync_offset"    : 5,
+        "v_sync_width"     : 5,
+        "v_sync_backporch" : 20,
+    },
+}
 
 class SimSoC(SoCCore):
     def __init__(self,
@@ -93,7 +183,7 @@ class SimSoC(SoCCore):
         sys_clk_freq = int(1e6)
 
         # CRG --------------------------------------------------------------------------------------
-        self.crg = CRG(platform.request("sys_clk"))
+        self.crg = _CRG(platform.request("sys_clk"))
 
         # SoCCore ----------------------------------------------------------------------------------
         SoCCore.__init__(self, platform, clk_freq=sys_clk_freq,
@@ -145,9 +235,6 @@ class SimSoC(SoCCore):
         self.bus.add_master("mistex", avl2wb.a2w_wb)
 
         # MiSTeR -----------------------------------------------------------------------------------
-        self.cd_emu = ClockDomain()
-        self.comb += self.cd_emu.clk.eq(ClockSignal("sys"))
-
         source_r  = Signal(8)
         source_g  = Signal(8)
         source_b  = Signal(8)
@@ -158,12 +245,12 @@ class SimSoC(SoCCore):
         test_pattern = True
         if test_pattern:
             # Video Timing Generator.
-            vtg = VideoTimingGenerator(default_video_timings="640x480@60Hz")
-            vtg = ClockDomainsRenamer("sys")(vtg)
+            vtg = VideoTimingGenerator(default_video_timings=modes["lowres"])
+            vtg = ClockDomainsRenamer("lowres")(vtg)
             self.add_module(name="vtg", module=vtg)
 
             # ColorsBars Pattern.
-            colorbars = ClockDomainsRenamer("sys")(ColorBarsPattern())
+            colorbars = ClockDomainsRenamer("lowres")(ColorBarsPattern())
             self.add_module(name="colorbars", module=colorbars)
 
             # Connect Video Timing Generator to ColorsBars Pattern.
@@ -205,14 +292,15 @@ class SimSoC(SoCCore):
             )
         )
 
-        WIDTH   = 1280
-        HFP     = 110
-        HS      = 40
-        HBP     = 220
-        HEIGHT  = 720
-        VFP     = 5
-        VS      = 5
-        VBP     = 20
+        mode    = modes["midres"]
+        WIDTH   = mode['h_active']
+        HFP     = mode['h_sync_offset']
+        HS      = mode['h_sync_width']
+        HBP     = mode['h_sync_backporch']
+        HEIGHT  = mode['v_active']
+        VFP     = mode['v_sync_offset']
+        VS      = mode['v_sync_width']
+        VBP     = mode['v_sync_backporch']
         HDMI_PR = 0
 
         vga_out_r  = Signal(8)
@@ -233,15 +321,15 @@ class SimSoC(SoCCore):
         	i_vimax    = 0,
 
             # video input
-            i_i_r   = source_r,
-            i_i_g   = source_g,
-            i_i_b   = source_b,
+            i_i_r   = source_r, # 0x0,
+            i_i_g   = source_g, # 0x0,
+            i_i_b   = source_b, # 0x0,
             i_i_hs  = source_hs,
             i_i_vs  = source_vs,
             i_i_de  = source_de,
             i_i_fl  = 0,
             i_i_ce  = 1,
-            i_i_clk = ClockSignal(),
+            i_i_clk = ClockSignal("lowres"),
 
             # video output
             o_o_r   = vga_out_r,
@@ -253,7 +341,7 @@ class SimSoC(SoCCore):
             o_o_vbl = Open(),
             o_o_brd = Open(),
             i_o_ce  = 1,
-            i_o_clk = ClockSignal(),
+            i_o_clk = ClockSignal("hdmi"),
 
             o_o_lltune = Open(),
 
@@ -270,13 +358,13 @@ class SimSoC(SoCCore):
 	        i_vdisp    = HEIGHT,
 	        i_vmin     = 0,       # TODO: What should go here?
 	        i_vmax     = HEIGHT,  # TODO: What should go here?
-	        i_vrr      = 0,       # 
+	        i_vrr      = 0,       #
 	        i_vrrmax   = HEIGHT + VBP + VS + 1,
 
             i_mode     = Constant(0, 4),
 
             # polyphase filter coefficients
-            i_poly_clk = ClockSignal(),
+            i_poly_clk = ClockSignal("hdmi"),
             i_poly_a   = 0,
             i_poly_dw  = 0,
             i_poly_wr  = 0,
@@ -430,7 +518,7 @@ def main():
 
     # Build/Run ------------------------------------------------------------------------------------
     def pre_run_callback(vns):
-        if args.trace:
+        if args.trace and False:
             generate_gtkw_savefile(builder, vns, args.trace_fst)
 
     builder = Builder(soc, **parser.builder_argdict)
