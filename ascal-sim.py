@@ -44,8 +44,11 @@ from gateware.vga_capture import VGACapture
 
 _io = [
     # Clk / Rst.
-    ("sys_clk", 0, Pins(1)),
-    ("sys_rst", 0, Pins(1)),
+    ("sys_clkin",    0, Pins(1)),
+    ("sys_rst",      0, Pins(1)),
+    ("emu_clkin",    0, Pins(1)),
+    ("lowres_clkin", 0, Pins(1)),
+    ("hdmi_clkin",   0, Pins(1)),
 
     # Serial.
     ("serial", 0,
@@ -60,12 +63,13 @@ _io = [
 
     # Video (VGA).
     ("vga", 0,
-        Subsignal("hsync", Pins(1)),
-        Subsignal("vsync", Pins(1)),
-        Subsignal("de",    Pins(1)),
-        Subsignal("r",     Pins(8)),
-        Subsignal("g",     Pins(8)),
-        Subsignal("b",     Pins(8)),
+        Subsignal("clk",     Pins(1)),
+        Subsignal("hsync",   Pins(1)),
+        Subsignal("vsync",   Pins(1)),
+        Subsignal("de",      Pins(1)),
+        Subsignal("r",       Pins(8)),
+        Subsignal("g",       Pins(8)),
+        Subsignal("b",       Pins(8)),
     )
 ]
 
@@ -78,51 +82,28 @@ class Platform(SimPlatform):
 # CRG -----------------------------------------------------------------------------------------
 
 class _CRG(Module):
-    def __init__(self, clk, rst=0):
+    def __init__(self, platform):
         self.clock_domains.cd_sys    = ClockDomain()
         self.clock_domains.cd_por    = ClockDomain(reset_less=True)
         self.clock_domains.cd_emu    = ClockDomain()
         self.clock_domains.cd_lowres = ClockDomain()
         self.clock_domains.cd_hdmi   = ClockDomain()
 
-        if hasattr(clk, "p"):
-            clk_se = Signal()
-            self.specials += DifferentialInput(clk.p, clk.n, clk_se)
-            clk = clk_se
-
-        # CLK = 100MHz
-        clk_retro  = Signal()
-        clk_lowres = Signal()
-        clk_hdmi   = Signal()
-
-        clk_div2          = Signal(reset=1) # 50 MHz
-        clk_div4          = Signal(reset=1) # 25 MHz
-        clk_div4_counter  = Signal()
-
-        clk_div20         = Signal(reset=1) # 5 MHz
-        clk_div20_counter = Signal(4)
-
-        self.sync += [
-            clk_div2.eq(~clk_div2),
-            clk_div4_counter.eq(clk_div4_counter + 1),
-            If(clk_div4_counter, clk_div4.eq(~clk_div4)),
-            If(clk_div20_counter == 9,
-                clk_div20_counter.eq(0),
-                clk_div20.eq(~clk_div20))
-            .Else(clk_div20_counter.eq(clk_div20_counter + 1)),
-        ]
+        sys_clk = platform.request("sys_clkin")
+        rst = 0
 
         # Power on Reset (vendor agnostic)
         int_rst = Signal(reset=1)
         self.sync.por += int_rst.eq(rst)
-        self.comb += [
-            self.cd_sys    .clk.eq(clk),
-            self.cd_sys    .rst.eq(int_rst),
-            self.cd_por    .clk.eq(clk),
 
-            self.cd_emu    .clk.eq(clk_div2),
-            self.cd_lowres .clk.eq(clk_div20),
-            self.cd_hdmi   .clk.eq(clk_div4),
+        self.comb += [
+            self.cd_sys    .clk.eq(sys_clk),
+            self.cd_sys    .rst.eq(int_rst),
+            self.cd_por    .clk.eq(sys_clk),
+
+            self.cd_emu    .clk.eq(platform.request("emu_clkin")),
+            self.cd_lowres .clk.eq(platform.request("lowres_clkin")),
+            self.cd_hdmi   .clk.eq(platform.request("hdmi_clkin")),
         ]
 
 # Simulation SoC -----------------------------------------------------------------------------------
@@ -180,10 +161,10 @@ class SimSoC(SoCCore):
         mister_core           = "template",
         **kwargs):
         platform     = Platform()
-        sys_clk_freq = int(1e6)
+        sys_clk_freq = int(100e6)
 
         # CRG --------------------------------------------------------------------------------------
-        self.crg = _CRG(platform.request("sys_clk"))
+        self.crg = _CRG(platform)
 
         # SoCCore ----------------------------------------------------------------------------------
         SoCCore.__init__(self, platform, clk_freq=sys_clk_freq,
@@ -391,6 +372,7 @@ class SimSoC(SoCCore):
         # Video ------------------------------------------------------------------------------------
         vga_pads = platform.request("vga")
         self.comb += [
+            vga_pads.clk.eq(ClockSignal("hdmi")),
             vga_pads.r.eq(vga_out_r),
             vga_pads.g.eq(vga_out_g),
             vga_pads.b.eq(vga_out_b),
@@ -461,16 +443,18 @@ def main():
 
     soc_kwargs = soc_core_argdict(args)
 
-    sys_clk_freq = int(1e6)
     sim_config   = SimConfig()
-    sim_config.add_clocker("sys_clk", freq_hz=sys_clk_freq)
+    sim_config.add_clocker("sys_clkin",    freq_hz=int(100e6))
+    sim_config.add_clocker("lowres_clkin", freq_hz=int(5e6))
+    sim_config.add_clocker("hdmi_clkin",   freq_hz=int(25e6))
+    sim_config.add_clocker("emu_clkin",    freq_hz=int(50e6))
 
     # Configuration --------------------------------------------------------------------------------
 
     # UART.
     if soc_kwargs["uart_name"] == "serial":
         soc_kwargs["uart_name"] = "sim"
-        sim_config.add_module("serial2console", "serial")
+        #sim_config.add_module("serial2console", "serial", clocks="sys_clkin")
 
     # Create config SoC that will be used to prepare/configure real one.
     conf_soc = SimSoC(**soc_kwargs)
@@ -504,7 +488,7 @@ def main():
             ram_boot_address = get_boot_address(args.sdram_init)
 
     # Video.
-    sim_config.add_module("video", "vga")
+    sim_config.add_module("video", "vga", clocks="hdmi_clkin")
 
     # SoC ------------------------------------------------------------------------------------------
     soc = SimSoC(
