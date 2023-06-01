@@ -32,6 +32,8 @@ from litedram import modules as litedram_modules
 from litedram.modules import parse_spd_hexdump
 from litedram.phy.model import sdram_module_nphases, get_sdram_phy_settings
 from litedram.phy.model import SDRAMPHYModel
+from litex.soc.interconnect.avalon import AvalonMMInterface
+from litedram.frontend.avalon import LiteDRAMAvalonMM2Native
 
 from liteeth.common import *
 
@@ -203,17 +205,13 @@ class SimSoC(SoCCore):
 
         self.add_constant("SDRAM_TEST_DISABLE")
 
-        self.submodules.avl2wb = avl2wb = AvalonMM2Wishbone(
-            data_width=128, address_width=28,
-            wishbone_base_address=0x4000000,
-            # wishbone address bus is 32 bits, word addressed
-            # since ascal has max 28 bits avalon address, that gives 24 wishbone
-            # bits, because data width is 128
-            # so we have to extend the wishbone side of the bridge by 8
-            wishbone_extend_address_bits=8,
-            avoid_combinatorial_loop=False)
+        # ascal can't take more than 28 bits of address width
+        avalon_data_width = 64
+        avalon_address_width = 28
 
-        self.bus.add_master("mistex", avl2wb.a2w_wb)
+        scaler_ddram_port  = self.sdram.crossbar.get_port(data_width=avalon_data_width)
+        self.scaler_ddram = scaler_ddram   = AvalonMMInterface(data_width=avalon_data_width, adr_width=avalon_address_width)
+        self.submodules.scaler_avalon_port = LiteDRAMAvalonMM2Native(scaler_ddram, scaler_ddram_port)
 
         # MiSTeR -----------------------------------------------------------------------------------
         source_r  = Signal(8)
@@ -267,9 +265,9 @@ class SimSoC(SoCCore):
             params = dict(
                 p_RAMBASE = 0x0,
                 p_PALETTE2 = "false",
-                p_N_AW    = 28,
-                p_N_DW    = 128,
-                p_N_BURST = 128
+                p_N_AW    = avalon_address_width,
+                p_N_DW    = avalon_data_width,
+                p_N_BURST = 64
             )
         )
 
@@ -358,15 +356,15 @@ class SimSoC(SoCCore):
             # avalon interface
 
             i_avl_clk           = ClockSignal(),
-            i_avl_waitrequest   = avl2wb.a2w_avl.waitrequest,
-            i_avl_readdata      = avl2wb.a2w_avl.readdata,
-            i_avl_readdatavalid = avl2wb.a2w_avl.readdatavalid,
-            o_avl_burstcount    = avl2wb.a2w_avl.burstcount,
-            o_avl_writedata     = avl2wb.a2w_avl.writedata,
-            o_avl_address       = avl2wb.a2w_avl.address,
-            o_avl_write         = avl2wb.a2w_avl.write,
-            o_avl_read          = avl2wb.a2w_avl.read,
-            o_avl_byteenable    = avl2wb.a2w_avl.byteenable,
+            i_avl_waitrequest   = scaler_ddram.waitrequest,
+            i_avl_readdata      = scaler_ddram.readdata,
+            i_avl_readdatavalid = scaler_ddram.readdatavalid,
+            o_avl_burstcount    = scaler_ddram.burstcount,
+            o_avl_writedata     = scaler_ddram.writedata,
+            o_avl_address       = scaler_ddram.address,
+            o_avl_write         = scaler_ddram.write,
+            o_avl_read          = scaler_ddram.read,
+            o_avl_byteenable    = scaler_ddram.byteenable,
         )
 
         # Video ------------------------------------------------------------------------------------
