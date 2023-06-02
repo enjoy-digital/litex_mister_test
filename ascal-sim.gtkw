@@ -1,0 +1,103 @@
+[*]
+[*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
+[*] Wed May 10 06:42:28 2023
+[*]
+[dumpfile] "build/sim/gateware/sim.fst"
+[dumpfile_mtime] "Wed May 10 06:15:14 2023"
+[dumpfile_size] 124063779
+[savefile] "sim.gtkw"
+[timestart] 1250000000
+[size] 2550 2822
+[pos] -1 -1
+*-33.435291 68387650000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] TOP.
+[treeopen] TOP.sim.
+[sst_width] 296
+[signals_width] 630
+[sst_expanded] 1
+[sst_vpaned_height] 549
+@28
+TOP.sim.ascal.avl_clk
+@200
+-Avalon
+@22
+TOP.sim.ascal.avl_address[27:0]
+TOP.sim.ascal.avl_burstcount[7:0]
+TOP.sim.ascal.avl_byteenable[15:0]
+@28
+TOP.sim.ascal.avl_waitrequest
+TOP.sim.ascal.avl_read
+@22
+TOP.sim.ascal.avl_readdata[127:0]
+@28
+TOP.sim.ascal.avl_readdatavalid
+TOP.sim.ascal.avl_write
+@22
+TOP.sim.ascal.avl_writedata[127:0]
+@200
+-
+-Wishbone
+@22
+TOP.sim.main_simsoc_a2w_wb_dat_r[127:0]
+TOP.sim.main_simsoc_a2w_wb_dat_w[127:0]
+TOP.sim.main_simsoc_a2w_wb_sel[15:0]
+@28
+TOP.sim.main_simsoc_a2w_wb_cyc
+TOP.sim.main_simsoc_a2w_wb_stb
+TOP.sim.main_simsoc_a2w_wb_we
+TOP.sim.main_simsoc_a2w_wb_ack
+TOP.sim.main_simsoc_a2w_wb_cti[2:0]
+TOP.sim.main_simsoc_a2w_wb_err
+@200
+-
+@22
+TOP.sim.main_simsoc_simsoc_litedram_wb_adr[29:0]
+TOP.sim.main_simsoc_simsoc_litedram_wb_dat_r[127:0]
+TOP.sim.main_simsoc_simsoc_litedram_wb_dat_w[127:0]
+@28
+TOP.sim.main_simsoc_simsoc_litedram_wb_err
+TOP.sim.main_simsoc_simsoc_litedram_wb_cyc
+TOP.sim.main_simsoc_simsoc_litedram_wb_stb
+TOP.sim.main_simsoc_simsoc_litedram_wb_we
+TOP.sim.main_simsoc_simsoc_litedram_wb_ack
+@22
+TOP.sim.main_simsoc_simsoc_litedram_wb_sel[15:0]
+@28
+TOP.sim.main_simsoc_simsoc_litedram_wb_cti[2:0]
+@200
+-
+@22
+TOP.sim.main_simsoc_simsoc_port_cmd_payload_addr[23:0]
+@28
+TOP.sim.main_simsoc_simsoc_port_cmd_valid
+@200
+-
+@820
+TOP.serial_source_data[7:0]
+@800200
+-color_data
+@22
+TOP.sim.main_simsoc_source_g[7:0]
+TOP.sim.main_simsoc_source_r[7:0]
+TOP.sim.main_simsoc_source_b[7:0]
+@1000200
+-color_data
+@28
+TOP.sim.main_simsoc_source_hs
+TOP.sim.main_simsoc_source_vs
+TOP.sim.main_simsoc_source_de
+@29
+TOP.sim.lowres_clk
+@200
+-
+@22
+TOP.sim.main_simsoc_vga_out_r[7:0]
+TOP.sim.main_simsoc_vga_out_g[7:0]
+TOP.sim.main_simsoc_vga_out_b[7:0]
+@28
+TOP.sim.main_simsoc_vga_out_hs
+TOP.sim.main_simsoc_vga_out_vs
+TOP.sim.main_simsoc_vga_out_de
+TOP.sim.hdmi_clk
+[pattern_trace] 1
+[pattern_trace] 0
