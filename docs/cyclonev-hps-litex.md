@@ -91,6 +91,8 @@ writes to `--hps-stub-addr`, which defaults to `0xff201000` and targets the `hps
 CSR. This is useful for synthesis, fit, timing and MiSTer source-list validation, but it is
 not a HPS model and is not a hardware bring-up path. Real HPS/Linux builds still require
 `--hps-ip`; the target rejects combining `--with-hps-stub` and `--hps-ip`.
+`docs/platform-designer-hps.md` describes the generated wrapper shape and
+`tools/check_cyclonev_hps_wrapper.py` validates it before a full Quartus build.
 
 The DE10-Nano target declares HPS DDR as a LiteX bus region at `0x00000000` so the
 hard CPU reset address is valid in LiteX metadata. Its default size is `0x40000000`
@@ -206,6 +208,9 @@ python3 terasic_de10nano_hps.py --build --no-compile-software \
   --output-dir build/de10nano_hps \
   --hps-ip path/to/cyclonev_hps_litex.qip
 ```
+
+After the bitstream is built, follow `docs/linux-hps-bringup.md` for the Linux bridge and
+CSR probe sequence.
 
 ## Project Integration
 

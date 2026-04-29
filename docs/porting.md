@@ -64,9 +64,14 @@ status_controls:
 `source_root` is the core repository or imported source directory. Paths inside the manifest
 are relative to `source_root`.
 
+Each `status_controls` entry becomes a LiteX CSR named `mister_<name>` when the carrier is
+instantiated. For example, `name: rst` becomes `mister_rst` in the generated CSR CSV.
+
 ## First-Port Checklist
 
 - Run `python3 tools/check_mister_manifests.py <core>`.
+- Run `python3 tools/extract_mister_confstr.py <core> --format yaml` and copy the useful
+  `status_controls` into the manifest.
 - Run `python3 sim.py --core <core> --cpu-type=None --no-compile`.
 - If elaboration fails, first check for missing source files, include paths and vendor RAM/PLL
   primitives.

@@ -22,6 +22,9 @@ python3 tools/check_mister_manifests.py
 python3 tools/smoke_mister_cores.py
 python3 tools/describe_host_bridges.py
 python3 tools/check_cyclonev_hps_cpu.py
+python3 tools/extract_mister_confstr.py template --check-manifest
+python3 tools/check_cyclonev_hps_wrapper.py --help
+python3 tools/hps_csr_probe.py --dry-run
 python3 sim.py --core template --cpu-type=None --no-compile
 python3 sim.py --core memtest --cpu-type=None --no-compile
 python3 terasic_de10nano_hps.py --help
@@ -29,5 +32,6 @@ PATH=/opt/quartus_lite_23.1/quartus/bin:$PATH python3 terasic_de10nano_hps.py --
 PATH=/opt/quartus_lite_23.1/quartus/bin:$PATH python3 terasic_de10nano_hps.py --build --no-compile-software --output-dir /tmp/litex_de10nano_hps_quartus_stub_template --with-hps-stub --with-mister --core template
 ```
 
-See `docs/architecture.md`, `docs/porting.md`, `docs/host-bridges.md`,
-`docs/cyclonev-hps-litex.md` and `docs/roadmap.md` for the intended direction.
+See `docs/status.md`, `docs/architecture.md`, `docs/porting.md`, `docs/host-bridges.md`,
+`docs/cyclonev-hps-litex.md`, `docs/platform-designer-hps.md`,
+`docs/linux-hps-bringup.md` and `docs/roadmap.md` for the intended direction.

@@ -50,6 +50,18 @@ status_controls:
     bit: 3
     width: 2
     description: Template color/noise option.
+  - name: option_1_1
+    bit: 5
+    width: 1
+    description: Template page-1 option.
+  - name: option_2
+    bit: 6
+    width: 2
+    description: Template page-2 option.
+  - name: option_1_2
+    bit: 10
+    width: 1
+    description: Template hidden page-1 option.
   - name: ar
     bit: 121
     width: 2

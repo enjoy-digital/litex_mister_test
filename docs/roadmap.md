@@ -6,7 +6,8 @@
 - Document the `emu` ABI and ownership boundary.
 - Add smoke checks that run without vendor place-and-route.
 
-Status: started in this branch.
+Status: implemented for manifest checks and simulation/no-compile smoke checks. Full
+vendor smoke is available for DE10-Nano through the temporary HPS stub.
 
 ## Phase 1: Manifest-Driven Cores
 
@@ -14,13 +15,17 @@ Status: started in this branch.
 - Keep board targets generic.
 - Make adding NES/PlayStation-style cores a metadata-first task.
 
-Status: started in this branch.
+Status: implemented for `template` and `memtest`. `tools/extract_mister_confstr.py`
+provides a first helper for generating status metadata from `CONF_STR`.
 
 ## Phase 2: Control, Input And OSD
 
 - Parse enough of `CONF_STR` to generate control/status CSRs.
 - Add keyboard, joystick, button and OSD control services.
 - Provide host tools to inspect and modify core settings.
+
+Status: partial. Status controls are manifest-driven and CONF_STR extraction exists, but
+keyboard, joystick and OSD services are not implemented.
 
 ## Phase 3: Video
 
@@ -53,6 +58,9 @@ Status: started in this branch.
 - Reuse the same host bridge contract for MiSTer status, input, storage, video and audio.
 
 Status: design documented in this branch.
+The out-of-tree `cyclonev_hps` CPU prototype, DE10-Nano HPS target, HPS wrapper ABI checker,
+Linux CSR probe and Quartus HPS smoke stub are implemented. Real Platform Designer HPS IP,
+Linux bridge access and IRQ delivery still need hardware validation.
 
 ## Phase 8: PCIe/M.2 FPGA Host
 

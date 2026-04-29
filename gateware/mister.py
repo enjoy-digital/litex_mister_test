@@ -226,6 +226,6 @@ class MiSTeR(LiteXModule):
             name  = control["name"]
             bit   = int(control["bit"])
             width = int(control.get("width", 1))
-            csr   = CSRStorage(width)
+            csr   = CSRStorage(width, name=name, description=control.get("description"))
             setattr(self, f"control_{name}", csr)
             self.comb += self.control[bit:bit + width].eq(csr.storage)
