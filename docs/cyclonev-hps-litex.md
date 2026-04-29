@@ -11,6 +11,72 @@ For this project, the missing piece is an upstreamable `cyclonev_hps` LiteX CPU/
 class and a DE10-Nano HPS target that can host the MiSTer carrier through normal LiteX
 CSRs and DMA paths.
 
+## Prior LiteX Discussion
+
+The same direction was already discussed upstream:
+
+- `litex-hub/litex-boards#63` asked whether the DE1-SoC target could use the hard
+  processor. The useful conclusions were that HPS support is worthwhile, the first design
+  should be inspired by the Zynq integration, the Cyclone V fabric bridges are AXI3, and
+  the easiest merge path is AXI-to-Wishbone for LiteX control.
+- `enjoy-digital/litex#466` tracked "Add hard processor support for Cyclone V". The
+  maintainer guidance was to first create a CPU-less LiteX SoC, instantiate the HPS, add
+  it as a Wishbone master through `AXI2Wishbone`, and only then decide the final upstream
+  shape. The thread also converged on a CPU-class approach, `cpu_type="hps"` in that
+  discussion, because it reuses normal `SoCCore` parser and integration behavior.
+- The same thread suggested using a Qsys/Platform Designer project file and letting
+  Quartus regenerate HPS HDL during the build, rather than committing generated vendor HDL.
+- `enjoy-digital/litex#2236` later added flexibility around custom UART pads. The motivating
+  use case was a DE10-Nano Linux HPS-to-FPGA UART path, using
+  `cyclonev_hps_interface_peripheral_uart`, so it is adjacent bring-up work but not a
+  replacement for a real HPS bus-master CPU class.
+- `enjoy-digital/litex#2224` shows a current DE1-SoC/Cyclone V JTAG pain point: the ARM HPS
+  TAP appears in the scan chain and can confuse `litex_term`/OpenOCD use. That is not part
+  of the HPS MMIO bridge, but it matters for developer ergonomics.
+
+The plan here should therefore not restart the debate. It should produce the missing
+working prototype, keep it close to the Zynq/ZynqMP CPU classes, then upstream the
+minimal useful subset.
+
+## Out-Of-Tree Prototype
+
+LiteX can discover CPU classes from the current working directory. A local prototype can
+live outside LiteX while still being selected by normal target arguments:
+
+```text
+cyclonev_hps/
+  __init__.py
+  core.py
+```
+
+`__init__.py` imports the class from `core.py`, and the class name should normalize to the
+directory name:
+
+```python
+from cyclonev_hps.core import CycloneVHPS
+```
+
+This lets a target started from this repository use `--cpu-type=cyclonev_hps` without
+patching the LiteX checkout. Once the class works, the same directory can be copied into
+`litex/soc/cores/cpu/cyclonev_hps/` for the upstream PR.
+
+The first prototype should avoid MiSTer complexity:
+
+1. Instantiate a minimal HPS component generated from Platform Designer.
+2. Expose only the lightweight HPS-to-FPGA AXI3 master.
+3. Append that AXI bus to `self.periph_buses`, just as `Zynq7000` appends PS GP0.
+4. Let LiteX convert AXI to the main Wishbone/CSR bus.
+5. Build a `SoCMini`/small `SoCCore` target with identifier, scratch CSR and LED CSR.
+6. Boot Linux on the HPS, enable FPGA bridges, map `0xff200000`, and read/write the CSR.
+
+After this succeeds, expand the prototype in small steps:
+
+1. Add FPGA-to-HPS IRQ lines and validate one LiteX event from Linux.
+2. Add optional full HPS-to-FPGA bridge for wider host reads/writes.
+3. Add optional FPGA-to-HPS or FPGA-to-SDRAM path for DMA/rings.
+4. Add the MiSTer carrier and drive `status` CSRs from Linux.
+5. Add video/audio/storage rings only after the control path and IRQ path are stable.
+
 ## Proposed LiteX Shape
 
 Add a new LiteX CPU core directory:
@@ -27,6 +93,11 @@ The `CycloneVHPS` class should be a hard CPU integration class, similar in role 
 Expected class responsibilities:
 
 - Declare the HPS as `category = "hardcore"`, `family = "arm"` and `name = "cyclonev_hps"`.
+- Use `variants = ["standard"]` first; add variants only for real bridge-width or board
+  generation differences.
+- Define `mem_map["csr"]` at the HPS-visible lightweight bridge address and set
+  `csr_decode = True`, matching the Zynq model where the bridge decodes the external
+  address window.
 - Add the lightweight HPS-to-FPGA AXI3 master as a LiteX peripheral bus.
 - Optionally add the full HPS-to-FPGA AXI3 master for wider host-to-fabric access.
 - Optionally add the FPGA-to-HPS AXI bridge so FPGA DMA masters can write HPS DDR.
@@ -35,9 +106,11 @@ Expected class responsibilities:
 - Generate or include the Quartus HPS component in a reproducible way.
 
 LiteX already has AXI and Avalon support. The preferred first version should keep the HPS
-fabric side in AXI3 and use existing LiteX AXI-to-Wishbone conversion for CSRs. Avalon-MM
-can be supported later if Platform Designer generation makes that path easier for some
-boards.
+fabric side in AXI3 and use existing LiteX AXI-to-Wishbone conversion for CSRs. Since LiteX
+Wishbone does not need bursts for the CSR path, the first bridge can be AXI-Lite-like
+behavior over the AXI3 pins. Full AXI3 burst coverage belongs in the later bulk/DMA phase,
+not the initial scratch-CSR milestone. Avalon-MM can be supported later if Platform Designer
+generation makes that path easier for some boards.
 
 ## Address Map
 
@@ -65,6 +138,8 @@ Target behavior:
 - Use the HPS lightweight bridge for LiteX CSRs.
 - Keep the existing MiSTer SDRAM/video/SD-card expansion IO definitions from the current
   DE10-Nano platform.
+- Optionally instantiate the HPS peripheral UART path described in the UART pads PR for
+  low-friction development from Linux.
 - Emit CSR CSV/header files for Linux-side tests and drivers.
 
 The first board proof should be deliberately small:
@@ -108,9 +183,17 @@ For Cyclone V specifically:
 
 ## Upstream Sequence
 
-1. Add a minimal `cyclonev_hps` CPU class with the lightweight bridge only.
-2. Add a DE10-Nano HPS target with scratch CSR validation.
-3. Add IRQ support.
-4. Add optional full HPS-to-FPGA bridge.
-5. Add optional FPGA-to-HPS DMA bridge.
-6. Move this repository's `cyclonev-hps` host profile from design note to real target.
+1. Post the out-of-tree scratch-CSR prototype and link it to `litex#466`.
+2. Upstream the minimal `cyclonev_hps` CPU class with lightweight bridge only.
+3. Upstream a DE10-Nano HPS target with scratch CSR validation.
+4. Add IRQ support.
+5. Add optional full HPS-to-FPGA bridge.
+6. Add optional FPGA-to-HPS DMA bridge.
+7. Move this repository's `cyclonev-hps` host profile from design note to real target.
+
+## References
+
+- https://github.com/litex-hub/litex-boards/issues/63
+- https://github.com/enjoy-digital/litex/issues/466
+- https://github.com/enjoy-digital/litex/pull/2236
+- https://github.com/enjoy-digital/litex/issues/2224
