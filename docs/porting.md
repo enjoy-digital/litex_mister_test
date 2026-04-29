@@ -36,6 +36,8 @@ source_dirs:
 platform_source_dirs:
   sim:
     - path: rtl_sim
+  altera:
+    - path: rtl_sim
   xilinx:
     - path: rtl_xilinx
   lattice:
@@ -69,7 +71,8 @@ are relative to `source_root`.
 - If elaboration fails, first check for missing source files, include paths and vendor RAM/PLL
   primitives.
 - Keep platform-specific shims in `rtl_sim`, `rtl_xilinx`, `rtl_lattice` or similar named
-  directories.
+  directories. Reusing the simulation shim for `altera` is acceptable for a first Quartus
+  smoke build when the shim is synthesis-safe.
 - Do not edit board targets for core-specific needs; express those needs in the manifest.
 
 ## Adoption Requirements

@@ -6,6 +6,8 @@
 # Copyright (c) 2026 Florent Kermarrec <florent@enjoy-digital.fr>
 # SPDX-License-Identifier: BSD-2-Clause
 
+from pathlib import Path
+
 from migen import *
 
 from litex.gen import *
@@ -17,6 +19,8 @@ from litex.soc.integration.soc import SoCRegion
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.interconnect.csr import *
+
+from cyclonev_hps.stub import write_hps_stub
 
 from gateware.mister import MiSTeR
 
@@ -44,6 +48,8 @@ class BaseSoC(SoCCore):
         hps_lw_prefix   = "h2f_lw",
         hps_ip          = None,
         hps_ddr_size    = 0x4000_0000,
+        with_hps_stub   = False,
+        hps_stub_addr   = 0xff201000,
         with_mister     = False,
         mister_core     = "template",
         **kwargs):
@@ -67,6 +73,16 @@ class BaseSoC(SoCCore):
                 h2f_lw_prefix = hps_lw_prefix,
                 ip_files      = hps_ip or [],
             )
+            if with_hps_stub:
+                if hps_ip:
+                    raise ValueError("--with-hps-stub is only for smoke builds without --hps-ip.")
+                stub_filename = Path("/tmp") / "litex_mister_hps_stubs" / f"{hps_module_name}_{hps_lw_prefix}_stub.v"
+                platform.add_source(str(write_hps_stub(
+                    filename      = stub_filename,
+                    module_name   = hps_module_name,
+                    h2f_lw_prefix = hps_lw_prefix,
+                    scratch_addr  = hps_stub_addr,
+                )))
             self.bus.add_region("sram", SoCRegion(
                 origin = self.cpu.mem_map["sram"],
                 size   = hps_ddr_size,
@@ -100,6 +116,10 @@ def main():
     parser.add_target_argument("--hps-ip",          action="append", default=[],  help="Generated HPS .qsys/.qip/.sip file to add to Quartus.")
     parser.add_target_argument("--hps-ddr-size",    default=0x4000_0000, type=lambda v: int(v, 0),
         help="HPS DDR size exposed in the LiteX memory map.")
+    parser.add_target_argument("--with-hps-stub",   action="store_true",
+        help="Add an HPS wrapper smoke stub for Quartus builds without Platform Designer IP.")
+    parser.add_target_argument("--hps-stub-addr",   default=0xff201000, type=lambda v: int(v, 0),
+        help="CSR byte address periodically written by the HPS smoke stub.")
     parser.add_target_argument("--with-mister",     action="store_true",          help="Instantiate the manifest-driven MiSTer carrier.")
     parser.add_target_argument("--core",            default="template",           help="MiSTer core manifest to instantiate.")
     parser.set_defaults(cpu_type="cyclonev_hps")
@@ -114,6 +134,8 @@ def main():
         hps_lw_prefix   = args.hps_lw_prefix,
         hps_ip          = args.hps_ip,
         hps_ddr_size    = args.hps_ddr_size,
+        with_hps_stub   = args.with_hps_stub,
+        hps_stub_addr   = args.hps_stub_addr,
         with_mister     = args.with_mister,
         mister_core     = args.core,
         **parser.soc_argdict

@@ -81,7 +81,16 @@ The generated HPS wrapper is expected to expose this minimal ABI:
 - AXI3 ports named `<prefix>_awvalid`, `<prefix>_awready`, `<prefix>_awaddr`, and so on.
 
 The wrapper should be generated from Platform Designer and added with `--hps-ip`. For
-no-compile smoke checks it can remain a blackbox.
+elaboration-only checks it can remain a blackbox.
+
+Full Quartus smoke builds can temporarily use `--with-hps-stub` when the Platform Designer
+component has not been generated yet. This writes a Verilog module under
+`/tmp/litex_mister_hps_stubs/` with the same port ABI and adds it to the Quartus project.
+The stub drives the exported HPS reset/clock pins and periodically issues single-beat AXI3
+writes to `--hps-stub-addr`, which defaults to `0xff201000` and targets the `hps_scratch`
+CSR. This is useful for synthesis, fit, timing and MiSTer source-list validation, but it is
+not a HPS model and is not a hardware bring-up path. Real HPS/Linux builds still require
+`--hps-ip`; the target rejects combining `--with-hps-stub` and `--hps-ip`.
 
 The DE10-Nano target declares HPS DDR as a LiteX bus region at `0x00000000` so the
 hard CPU reset address is valid in LiteX metadata. Its default size is `0x40000000`
@@ -169,6 +178,34 @@ The first board proof should be deliberately small:
 5. Add one FPGA-to-HPS IRQ counter.
 
 Only after this path is stable should the target instantiate the MiSTer carrier.
+
+## Quartus Smoke Build
+
+The smoke path intentionally separates "does Quartus accept the LiteX generated design" from
+"does Linux on the HPS access the FPGA fabric". With Quartus in `PATH`, the base target can
+be checked without generated HPS IP:
+
+```sh
+python3 terasic_de10nano_hps.py --build --no-compile-software \
+  --output-dir /tmp/litex_de10nano_hps_quartus_stub \
+  --with-hps-stub
+```
+
+The same path can include a MiSTer manifest:
+
+```sh
+python3 terasic_de10nano_hps.py --build --no-compile-software \
+  --output-dir /tmp/litex_de10nano_hps_quartus_stub_template \
+  --with-hps-stub --with-mister --core template
+```
+
+For hardware work, replace `--with-hps-stub` with the generated Platform Designer file:
+
+```sh
+python3 terasic_de10nano_hps.py --build --no-compile-software \
+  --output-dir build/de10nano_hps \
+  --hps-ip path/to/cyclonev_hps_litex.qip
+```
 
 ## Project Integration
 

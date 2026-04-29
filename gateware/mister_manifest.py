@@ -6,6 +6,7 @@
 
 from pathlib import Path
 
+from litex.build.altera  import AlteraPlatform
 from litex.build.sim     import SimPlatform
 from litex.build.xilinx  import XilinxPlatform
 from litex.build.lattice import LatticePlatform
@@ -103,6 +104,8 @@ def load_core_manifest(core):
 def platform_family(platform):
     if isinstance(platform, SimPlatform) or platform is None:
         return "sim"
+    if isinstance(platform, AlteraPlatform):
+        return "altera"
     if isinstance(platform, XilinxPlatform):
         return "xilinx"
     if isinstance(platform, LatticePlatform):

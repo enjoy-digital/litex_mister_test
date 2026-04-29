@@ -17,6 +17,8 @@ source_dirs:
 platform_source_dirs:
   sim:
     - path: rtl_sim
+  altera:
+    - path: rtl_sim
   xilinx:
     - path: rtl_xilinx
   lattice:
