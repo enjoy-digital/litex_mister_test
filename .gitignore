@@ -1,0 +1,8 @@
+.codex
+__pycache__/
+*.py[cod]
+build/
+csr.csv
+csr.json
+csr.svd
+analyzer.csv

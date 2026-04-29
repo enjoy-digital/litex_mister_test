@@ -10,99 +10,182 @@ from litex.gen import *
 
 from litex.soc.interconnect.csr import *
 
-from litex.build.sim     import SimPlatform
-from litex.build.xilinx  import XilinxPlatform
-from litex.build.lattice import LatticePlatform
+from gateware.mister_manifest import add_manifest_sources, load_core_manifest
 
 # MiSTeR Top Level ---------------------------------------------------------------------------------
 
+_video_layout = [
+    # Generic video.
+    ("clk",       1),
+    ("ce",        1),
+    ("arx",      13),
+    ("ary",      13),
+
+    # VGA-style core output.
+    ("hsync_n",   1),
+    ("vsync_n",   1),
+    ("de",        1),
+    ("f1",        1),
+    ("sl",        2),
+    ("scaler",    1),
+    ("disable",   1),
+    ("r",         8),
+    ("g",         8),
+    ("b",         8),
+]
+
+_audio_layout = [
+    ("l",    16),
+    ("r",    16),
+    ("s",     1),
+    ("mix",   2),
+]
+
+_sd_spi_layout = [
+    ("sck",   1),
+    ("mosi",  1),
+    ("miso",  1),
+    ("cs",    1),
+    ("cd",    1),
+]
+
+_ddram_layout = [
+    ("clk",        1),
+    ("busy",       1),
+    ("burstcnt",   8),
+    ("addr",      29),
+    ("dout",      64),
+    ("dout_ready", 1),
+    ("rd",         1),
+    ("din",       64),
+    ("be",         8),
+    ("we",         1),
+]
+
+_uart_layout = [
+    ("cts", 1),
+    ("rts", 1),
+    ("rxd", 1),
+    ("txd", 1),
+    ("dtr", 1),
+    ("dsr", 1),
+]
+
+_user_io_layout = [
+    ("i", 7),
+    ("o", 7),
+]
+
+_leds_layout = [
+    ("user",  1),
+    ("power", 2),
+    ("disk",  2),
+]
+
+
 class MiSTeR(LiteXModule):
     def __init__(self, platform, core="template"):
+        self.manifest = manifest = load_core_manifest(core)
+
         # Control/Status Signals.
         # -----------------------
-        self.control = control = Signal(128)
+        self.status  = status  = Signal(128)
+        self.control = control = status # Backward-compatible alias.
 
-        # VGA Signals.
-        # ------------
-        self.vga = vga = Record([
-            # Synchronization signals.
-            ("clk",     1),
-            ("hsync_n", 1),
-            ("vsync_n", 1),
-            ("de",      1),
-            # Data signals.
-            ("r",       8),
-            ("g",       8),
-            ("b",       8),
-        ])
+        # Carrier-side interfaces.
+        # ------------------------
+        self.video = video = Record(_video_layout)
+        self.vga   = video # Backward-compatible alias used by existing targets.
+
+        self.audio  = audio  = Record(_audio_layout)
+        self.sd_spi = sd_spi = Record(_sd_spi_layout)
+        self.ddram  = ddram  = Record(_ddram_layout)
+        self.uart   = uart   = Record(_uart_layout)
+        self.user   = user   = Record(_user_io_layout)
+        self.leds   = leds   = Record(_leds_layout)
+
+        self.buttons     = Signal(2)
+        self.adc_bus     = Signal(4)
+        self.clk_audio   = Signal()
+        self.hdmi_width  = Signal(12)
+        self.hdmi_height = Signal(12)
+        self.hdmi_freeze = Signal()
+        self.osd_status  = Signal()
 
         # Core Instance.
         # --------------
-        self.specials += Instance("emu",
+        arx = Signal(manifest.video_aspect_width)
+        ary = Signal(manifest.video_aspect_width)
+        self.comb += [
+            video.arx.eq(arx),
+            video.ary.eq(ary),
+        ]
+
+        self.specials += Instance(manifest.top,
             # Clk/Rst.
             i_CLK_50M          = ClockSignal("emu"),
             i_RESET            = ResetSignal("emu"),
 
             # HPS Bus.
-            io_HPS_BUS         = Open(49) if core == "template" else Open(46), # FIXME.
+            io_HPS_BUS         = Open(manifest.hps_bus_width),
 
             # Video (Generic).
-            o_CLK_VIDEO        = vga.clk,
-            o_CE_PIXEL         = Open(), # FIXME.
-            o_VIDEO_ARX        = Open(), # FIXME.
-            o_VIDEO_ARY        = Open(), # FIXME.
+            o_CLK_VIDEO        = video.clk,
+            o_CE_PIXEL         = video.ce,
+            o_VIDEO_ARX        = arx,
+            o_VIDEO_ARY        = ary,
 
             # Video VGA.
-            o_VGA_R            = vga.r[::-1],
-            o_VGA_G            = vga.g[::-1],
-            o_VGA_B            = vga.b[::-1],
-            o_VGA_HS           = vga.hsync_n,
-            o_VGA_VS           = vga.vsync_n,
-            o_VGA_DE           = vga.de,
-            o_VGA_F1           = Open(), # FIXME.
-            o_VGA_SL           = Open(), # FIXME.
-            o_VGA_SCALER       = Open(), # FIXME.
-            o_VGA_DISABLE      = Open(), # FIXME.
+            o_VGA_R            = video.r[::-1],
+            o_VGA_G            = video.g[::-1],
+            o_VGA_B            = video.b[::-1],
+            o_VGA_HS           = video.hsync_n,
+            o_VGA_VS           = video.vsync_n,
+            o_VGA_DE           = video.de,
+            o_VGA_F1           = video.f1,
+            o_VGA_SL           = video.sl,
+            o_VGA_SCALER       = video.scaler,
+            o_VGA_DISABLE      = video.disable,
 
             # HDMI.
-            i_HDMI_WIDTH       = 0,      # FIXME.
-            i_HDMI_HEIGHT      = 0,      # FIXME.
-            o_HDMI_FREEZE      = Open(), # FIXME.
+            i_HDMI_WIDTH       = self.hdmi_width,
+            i_HDMI_HEIGHT      = self.hdmi_height,
+            o_HDMI_FREEZE      = self.hdmi_freeze,
 
             # Leds.
-            o_LED_USER         = Open(), # FIXME.
-            o_LED_POWER        = Open(), # FIXME.
-            o_LED_DISK         = Open(), # FIXME.
+            o_LED_USER         = leds.user,
+            o_LED_POWER        = leds.power,
+            o_LED_DISK         = leds.disk,
 
             # Buttons.
-            o_BUTTONS          = Open(), # FIXME.
+            o_BUTTONS          = self.buttons,
 
             # Audio.
-            i_CLK_AUDIO        = 0,       # FIXME.
-            o_AUDIO_L          = Open(),  # FIXME.
-            o_AUDIO_R          = Open(),  # FIXME.
-            o_AUDIO_S          = Open(),  # FIXME.
-            o_AUDIO_MIX        = Open(),  # FIXME.
-            io_ADC_BUS         = Open(4), # FIXME.
+            i_CLK_AUDIO        = self.clk_audio,
+            o_AUDIO_L          = audio.l,
+            o_AUDIO_R          = audio.r,
+            o_AUDIO_S          = audio.s,
+            o_AUDIO_MIX        = audio.mix,
+            io_ADC_BUS         = self.adc_bus,
 
             # SDCard.
-            o_SD_SCK           = Open(), # FIXME.
-            o_SD_MOSI          = Open(), # FIXME.
-            i_SD_MISO          = 0,      # FIXME.
-            o_SD_CS            = Open(), # FIXME.
-            i_SD_CD            = 0,      # FIXME.
+            o_SD_SCK           = sd_spi.sck,
+            o_SD_MOSI          = sd_spi.mosi,
+            i_SD_MISO          = sd_spi.miso,
+            o_SD_CS            = sd_spi.cs,
+            i_SD_CD            = sd_spi.cd,
 
             # DDRAM (DDR3).
-            o_DDRAM_CLK        = Open(), # FIXME.
-            i_DDRAM_BUSY       = 0,      # FIXME.
-            o_DDRAM_BURSTCNT   = Open(), # FIXME.
-            o_DDRAM_ADDR       = Open(), # FIXME.
-            i_DDRAM_DOUT       = 0,      # FIXME.
-            i_DDRAM_DOUT_READY = 0,      # FIXME.
-            o_DDRAM_RD         = Open(), # FIXME.
-            o_DDRAM_DIN        = Open(), # FIXME.
-            o_DDRAM_BE         = Open(), # FIXME.
-            o_DDRAM_WE         = Open(), # FIXME.
+            o_DDRAM_CLK        = ddram.clk,
+            i_DDRAM_BUSY       = ddram.busy,
+            o_DDRAM_BURSTCNT   = ddram.burstcnt,
+            o_DDRAM_ADDR       = ddram.addr,
+            i_DDRAM_DOUT       = ddram.dout,
+            i_DDRAM_DOUT_READY = ddram.dout_ready,
+            o_DDRAM_RD         = ddram.rd,
+            o_DDRAM_DIN        = ddram.din,
+            o_DDRAM_BE         = ddram.be,
+            o_DDRAM_WE         = ddram.we,
 
             # SDRAM.
             #o_SDRAM_CLK        = Open(),   # FIXME.
@@ -118,57 +201,31 @@ class MiSTeR(LiteXModule):
             #o_SDRAM_nWE        = Open(),   # FIXME.
 
             # UART.
-            i_UART_CTS         = 0,      # FIXME.
-            o_UART_RTS         = Open(), # FIXME.
-            i_UART_RXD         = 0,      # FIXME.
-            o_UART_TXD         = Open(), # FIXME.
-            o_UART_DTR         = Open(), # FIXME.
-            i_UART_DSR         = 0,      # FIXME.
+            i_UART_CTS         = uart.cts,
+            o_UART_RTS         = uart.rts,
+            i_UART_RXD         = uart.rxd,
+            o_UART_TXD         = uart.txd,
+            o_UART_DTR         = uart.dtr,
+            i_UART_DSR         = uart.dsr,
 
             # USER.
-            i_USER_IN          = 0,      # FIXME.
-            o_USER_OUT         = Open(), # FIXME.
+            i_USER_IN          = user.i,
+            o_USER_OUT         = user.o,
 
             # OSD.
-            i_OSD_STATUS       = 0,      # FIXME.
+            i_OSD_STATUS       = self.osd_status,
 
             # STATUS
             i_status           = control, # FIXME: Name.
         )
-        if core == "template":
-            platform.add_verilog_include_path("Template_MiSTer")
-            platform.add_source_dir("Template_MiSTer", recursive=False)
-            platform.add_source_dir("Template_MiSTer/rtl")
-            platform.add_source("Template_MiSTer/rtl/cos.init", copy=True)
-            if isinstance(platform, XilinxPlatform):
-                platform.add_source_dir("Template_MiSTer/rtl_xilinx")
-            if isinstance(platform, LatticePlatform):
-                platform.add_source_dir("Template_MiSTer/rtl_lattice")
-            if isinstance(platform, SimPlatform):
-                platform.add_source_dir("Template_MiSTer/rtl_sim")
-        elif core == "memtest":
-            platform.add_verilog_include_path("MemTest_MiSTer")
-            platform.add_source_dir("MemTest_MiSTer", recursive=False)
-            platform.add_source_dir("MemTest_MiSTer/rtl")
-            if isinstance(platform, XilinxPlatform):
-                platform.add_source_dir("Template_MiSTer/rtl_xilinx")
-            if isinstance(platform, LatticePlatform):
-                platform.add_source_dir("Template_MiSTer/rtl_lattice")
-            if isinstance(platform, SimPlatform):
-                platform.add_source_dir("Template_MiSTer/rtl_sim")
-        else:
-            raise NotImplementedError("Unsuported MiSTeR core.")
+        add_manifest_sources(platform, manifest)
 
     def add_control_status_csr(self):
         # Control CSRs.
-        self.control_rst = CSRStorage(1)
-        self.control_pal = CSRStorage(1)
-        self.control_col = CSRStorage(2)
-        self.control_ar  = CSRStorage(2)
-
-        self.comb += [
-            self.control[        0].eq(self.control_rst.storage),
-            self.control[        2].eq(self.control_pal.storage),
-            self.control[    3:3+2].eq(self.control_col.storage),
-            self.control[121:121+2].eq(self.control_ar.storage),
-        ]
+        for control in self.manifest.status_controls:
+            name  = control["name"]
+            bit   = int(control["bit"])
+            width = int(control.get("width", 1))
+            csr   = CSRStorage(width)
+            setattr(self, f"control_{name}", csr)
+            self.comb += self.control[bit:bit + width].eq(csr.storage)

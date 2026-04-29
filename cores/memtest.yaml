@@ -1,0 +1,45 @@
+name: memtest
+display_name: MiSTer SDRAM MemTest
+description: MiSTer SDRAM memory-test core used as a more realistic compatibility target.
+top: emu
+source_root: MemTest_MiSTer
+hps_bus_width: 46
+video_aspect_width: 12
+
+include_dirs:
+  - .
+
+source_dirs:
+  - path: .
+    recursive: false
+  - path: rtl
+
+platform_source_dirs:
+  sim:
+    - path: rtl_sim
+  xilinx:
+    - path: rtl_xilinx
+  lattice:
+    - path: rtl_lattice
+
+interfaces:
+  video: true
+  audio: true
+  sd_spi: true
+  ddram: true
+  sdram: true
+  uart: true
+  user_io: true
+  framebuffer: false
+
+status_controls:
+  - name: rst
+    bit: 0
+    width: 1
+    description: Core reset.
+
+porting:
+  maturity: smoke
+  notes:
+    - Uses the core-local simulation, Xilinx and Lattice PLL shims.
+    - Full SDRAM pin/carrier integration is still future work; current smoke mode leaves SDRAM unconnected.

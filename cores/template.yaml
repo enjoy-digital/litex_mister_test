@@ -1,0 +1,60 @@
+name: template
+display_name: MiSTer Template Core
+description: Minimal MiSTer template core used to validate the LiteX carrier.
+top: emu
+source_root: Template_MiSTer
+hps_bus_width: 49
+video_aspect_width: 13
+
+include_dirs:
+  - .
+
+source_dirs:
+  - path: .
+    recursive: false
+  - path: rtl
+
+platform_source_dirs:
+  sim:
+    - path: rtl_sim
+  xilinx:
+    - path: rtl_xilinx
+  lattice:
+    - path: rtl_lattice
+
+copy_sources:
+  - rtl/cos.init
+
+interfaces:
+  video: true
+  audio: true
+  sd_spi: true
+  ddram: true
+  sdram: true
+  uart: true
+  user_io: true
+  framebuffer: false
+
+status_controls:
+  - name: rst
+    bit: 0
+    width: 1
+    description: Core reset.
+  - name: pal
+    bit: 2
+    width: 1
+    description: PAL/NTSC mode select.
+  - name: col
+    bit: 3
+    width: 2
+    description: Template color/noise option.
+  - name: ar
+    bit: 121
+    width: 2
+    description: Aspect-ratio selection.
+
+porting:
+  maturity: smoke
+  notes:
+    - Template core used as the smallest always-buildable compatibility target.
+    - hps_io is bypassed; LiteX drives the status vector directly.
