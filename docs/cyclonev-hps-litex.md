@@ -60,6 +60,9 @@ This lets a target started from this repository use `--cpu-type=cyclonev_hps` wi
 patching the LiteX checkout. Once the class works, the same directory can be copied into
 `litex/soc/cores/cpu/cyclonev_hps/` for the upstream PR.
 
+This branch now provides that out-of-tree package in `cyclonev_hps/` and a first
+DE10-Nano target in `terasic_de10nano_hps.py`.
+
 The first prototype should avoid MiSTer complexity:
 
 1. Instantiate a minimal HPS component generated from Platform Designer.
@@ -68,6 +71,21 @@ The first prototype should avoid MiSTer complexity:
 4. Let LiteX convert AXI to the main Wishbone/CSR bus.
 5. Build a `SoCMini`/small `SoCCore` target with identifier, scratch CSR and LED CSR.
 6. Boot Linux on the HPS, enable FPGA bridges, map `0xff200000`, and read/write the CSR.
+
+The generated HPS wrapper is expected to expose this minimal ABI:
+
+- module name: `cyclonev_hps_litex` by default, override with `--hps-module-name`,
+- lightweight AXI prefix: `h2f_lw` by default, override with `--hps-lw-prefix`,
+- clock/reset ports: `h2f_lw_aclk`, `h2f_lw_areset_n`, `h2f_rst_n`,
+- IRQ port: `f2h_irq[63:0]`,
+- AXI3 ports named `<prefix>_awvalid`, `<prefix>_awready`, `<prefix>_awaddr`, and so on.
+
+The wrapper should be generated from Platform Designer and added with `--hps-ip`. For
+no-compile smoke checks it can remain a blackbox.
+
+The DE10-Nano target declares HPS DDR as a LiteX bus region at `0x00000000` so the
+hard CPU reset address is valid in LiteX metadata. Its default size is `0x40000000`
+and can be adjusted with `--hps-ddr-size` for boards with a different HPS memory map.
 
 After this succeeds, expand the prototype in small steps:
 

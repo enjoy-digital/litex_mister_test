@@ -17,8 +17,10 @@ Useful commands:
 python3 tools/check_mister_manifests.py
 python3 tools/smoke_mister_cores.py
 python3 tools/describe_host_bridges.py
+python3 tools/check_cyclonev_hps_cpu.py
 python3 sim.py --core template --cpu-type=None --no-compile
 python3 sim.py --core memtest --cpu-type=None --no-compile
+python3 terasic_de10nano_hps.py --help
 ```
 
 See `docs/architecture.md`, `docs/porting.md`, `docs/host-bridges.md`,
